@@ -6,7 +6,7 @@ Web แสดงข้อมูล IoT ภาคสนาม (เสียง �
 ## โครงสร้าง
 
 ```
-/Data       ข้อมูลต้นทาง unified_points.csv (ห้ามแก้)
+/Data       ข้อมูลต้นทาง unified_points.csv (ห้ามแก้ — ไม่อยู่ใน git ต้องวางเองตอน clone ใหม่)
 /pipeline   script preprocess: CSV → MongoDB + ดึงโซน OSM
 /server     Express REST API (port 3001)
 /web        Vite + React frontend

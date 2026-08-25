@@ -1,0 +1,21 @@
+{
+  "name": "pipeline",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "import": "node import_points.js",
+    "tracks": "node build_tracks.js",
+    "stats": "node build_stats.js",
+    "zones": "node fetch_zones.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@turf/turf": "^7.4.0",
+    "csv-parse": "^7.0.2",
+    "dotenv": "^17.4.2",
+    "mongodb": "^7.6.0"
+  }
+}

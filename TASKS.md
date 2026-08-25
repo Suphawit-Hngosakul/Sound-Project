@@ -8,14 +8,16 @@
 - [x] `git init` + commit แรก (`.agent/.claude/.gemini` ถูก ignore — เป็นไฟล์ tooling)
 
 ## Phase 1 — Pipeline + DB
-- [ ] Script import: อ่าน `Data/unified_points.csv` → collection `points`
+- [x] Script import: อ่าน `Data/unified_points.csv` → collection `points`
       (แปลง type, สร้าง `location` GeoJSON, คำนวณ `localDate` + `localMinutes` ตาม timezone dataset)
-- [ ] สร้าง index: `2dsphere(location)`, `dataset+timestamp`, `dataset+localDate`
-- [ ] Script สร้าง `tracks`: sort ต่อ device+วัน, ตัด segment เมื่อ gap > 120 วิ / กระโดดไกลผิดปกติ
-- [ ] Script สร้าง `daily_stats`: aggregate ต่อ dataset/วัน/ชั่วโมง (count, min/avg/max ต่อ metric)
-- [ ] Script ดึงโซน OSM (Overpass): bbox จากจุดจริง + buffer, tag ตาม PLAN ข้อ 9,
-      เก็บเฉพาะ polygon ที่มีจุดข้อมูลข้างใน → collection `zones` (`source: "osm"`)
-- [ ] ตรวจยอด: จำนวน docs ตรงกับ SCHEMA.md (81,629 points / 50,033 มี location)
+- [x] สร้าง index: `2dsphere(location)`, `dataset+timestamp`, `dataset+localDate` (อยู่ท้าย import script)
+- [x] Script สร้าง `tracks`: sort ต่อ device+วัน, ตัด segment เมื่อ gap > 120 วิ / speed > 45 m/s
+- [x] Script สร้าง `daily_stats`: aggregate ต่อ dataset/วัน/ชั่วโมง (count, min/avg/max ต่อ metric)
+- [x] Script ดึงโซน OSM (Overpass): cluster bbox จากจุดจริง + buffer, tag ตาม PLAN ข้อ 9,
+      เก็บเฉพาะ polygon ที่มีจุดข้อมูล ≥ 5 จุดข้างใน → collection `zones` (`source: "osm"`)
+- [ ] **รันจริงกับ Atlas** — รอ `MONGODB_URI` ใน `.env` จากผู้ใช้ แล้วรัน import → tracks → stats → zones
+- [x] ตรวจยอด (dry-run ไม่ใช้ DB): CSV = 81,629 แถว / **50,036** มีพิกัด — ตรงกับ geojson
+      (SCHEMA.md เขียน 50,033 เป็นเลขเก่าของเอกสาร ไม่ใช่ข้อมูลผิด)
 
 ## Phase 2 — API
 - [ ] `GET /api/datasets` — รายชื่อ + สรุป

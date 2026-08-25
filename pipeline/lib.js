@@ -3,6 +3,10 @@ const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 const { MongoClient } = require('mongodb');
 
+// DNS resolver ของ Windows บางเครื่องตอบ SRV query ให้ Node ไม่ได้ (querySrv ECONNREFUSED)
+// ทั้งที่ nslookup ปกติ — ชี้ public DNS เฉพาะใน process นี้
+require('dns').setServers(['8.8.8.8', '1.1.1.1']);
+
 const DATA_DIR = path.join(__dirname, '..', 'Data');
 const CSV_PATH = path.join(DATA_DIR, 'unified_points.csv');
 

@@ -102,6 +102,8 @@ GET  /api/zones/stats?date=&timeStart=&timeEnd=      ค่าเฉลี่ย
   - เอาเฉพาะ way/relation ที่เป็น polygon และ**ตัดเฉพาะโซนที่มีจุดข้อมูลตกอยู่ข้างใน** (ไม่งั้น residential ทั้งเมืองท่วม)
 - **วาดเอง** — Terra Draw: polygon/rectangle/circle → form ตั้งชื่อ ประเภท สี → POST เก็บใน Mongo
 - **Zone stats** — `$geoWithin` ต่อโซน: จำนวนจุด + min/avg/max ต่อ metric — แสดงหน้า Zones + Dashboard
+- **การแสดงบนแผนที่**: แสดงเฉพาะโซนที่อยู่ใกล้จุดข้อมูล **ไม่เกิน 20 กม.** — กรองฝั่ง API
+  (`GET /api/zones` เช็คระยะ geometry ถึงจุดข้อมูลใกล้สุด, cache ผล) โซนไกลกว่านั้นไม่ส่งไปวาด
 
 ## 10. Dashboard
 

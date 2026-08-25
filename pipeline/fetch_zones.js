@@ -1,9 +1,19 @@
 // Prebuild zones from OSM Overpass -> collection `zones` (source: "osm")
 // เก็บเฉพาะโซนที่มีจุดข้อมูลตกอยู่ข้างใน >= MIN_POINTS_IN_ZONE
+const fs = require('fs');
+const path = require('path');
+const crypto = require('crypto');
 const turf = require('@turf/turf');
 const { connect } = require('./lib');
 
-const OVERPASS_URL = 'https://overpass-api.de/api/interpreter';
+// cache ผล Overpass รายคำขอ — ล้มกลางทางรันใหม่ไม่ต้องดึงซ้ำ
+const CACHE_DIR = path.join(__dirname, '.overpass-cache');
+fs.mkdirSync(CACHE_DIR, { recursive: true });
+
+const OVERPASS_URLS = [
+  'https://overpass.kumi.systems/api/interpreter',
+  'https://overpass-api.de/api/interpreter',
+];
 const CELL_DEG = 0.2; // grid สำหรับ cluster พื้นที่ข้อมูล
 const BBOX_BUFFER_DEG = 0.01; // ~1 กม.
 const MIN_POINTS_IN_ZONE = 5;
@@ -79,18 +89,59 @@ function clusterBboxes(coords) {
   ]);
 }
 
+async function overpassRequest(query) {
+  const cacheFile = path.join(CACHE_DIR, crypto.createHash('md5').update(query).digest('hex') + '.json');
+  if (fs.existsSync(cacheFile)) {
+    process.stderr.write('(cache) ');
+    return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
+  }
+  // --cache-only: ใช้เฉพาะที่ดึงมาแล้ว ไม่ยิง Overpass เพิ่ม
+  if (process.argv.includes('--cache-only')) {
+    process.stderr.write('(no cache, skip) ');
+    return [];
+  }
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    for (const url of OVERPASS_URLS) {
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'User-Agent': 'SoundProject-pipeline/1.0 (IoT field data visualization; github Suphawit-Hngosakul/Sound-Project)',
+          },
+          body: 'data=' + encodeURIComponent(query),
+          signal: AbortSignal.timeout(150000), // กัน connection ค้างแขวนทั้ง script
+        });
+        if (res.ok) {
+          const elements = (await res.json()).elements || [];
+          fs.writeFileSync(cacheFile, JSON.stringify(elements));
+          return elements;
+        }
+        lastErr = new Error(`Overpass ${res.status} @ ${url}`);
+      } catch (e) {
+        lastErr = e;
+      }
+      await new Promise((r) => setTimeout(r, 5000));
+    }
+  }
+  throw lastErr;
+}
+
+// แตก query รายหมวดต่อ bbox — คำขอเล็กลง เลี่ยง 504
 async function queryOverpass(bbox) {
   const [minLng, minLat, maxLng, maxLat] = bbox;
   const bb = `(${minLat},${minLng},${maxLat},${maxLng})`;
-  const parts = TAG_CATEGORIES.map((t) => `way${t.filter}${bb};relation${t.filter}${bb};`).join('\n');
-  const query = `[out:json][timeout:180];(\n${parts}\n);out geom;`;
-  const res = await fetch(OVERPASS_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: 'data=' + encodeURIComponent(query),
-  });
-  if (!res.ok) throw new Error(`Overpass ${res.status}: ${(await res.text()).slice(0, 200)}`);
-  return (await res.json()).elements || [];
+  const all = [];
+  for (const t of TAG_CATEGORIES) {
+    const query = `[out:json][timeout:120];(way${t.filter}${bb};relation${t.filter}${bb};);out geom;`;
+    process.stderr.write(`  ${t.filter} ... `);
+    const elements = await overpassRequest(query);
+    process.stderr.write(`${elements.length} elements\n`);
+    all.push(...elements);
+    await new Promise((r) => setTimeout(r, 1500));
+  }
+  return all;
 }
 
 function ringFromGeometry(geom) {
@@ -130,7 +181,12 @@ async function main() {
     .toArray();
   console.log(`data points with coords: ${coords.length}`);
 
-  const bboxes = clusterBboxes(coords);
+  let bboxes = clusterBboxes(coords);
+  // --thailand-only: ข้าม Osaka (lng > 110) ไปก่อน — Overpass ล้นบ่อย ค่อยรันเต็มทีหลัง
+  if (process.argv.includes('--thailand-only')) {
+    bboxes = bboxes.filter(([minLng]) => minLng < 110);
+    console.log('thailand-only mode');
+  }
   console.log(`region bboxes: ${bboxes.length}`);
 
   const seen = new Set();

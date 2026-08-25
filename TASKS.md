@@ -7,7 +7,7 @@
 - [x] `.env.example` (`MONGODB_URI`, `PORT`) + `.gitignore` + README วิธีรัน
 - [x] `git init` + commit แรก (`.agent/.claude/.gemini` ถูก ignore — เป็นไฟล์ tooling)
 
-## Phase 1 — Pipeline + DB
+## Phase 1 — Pipeline + DB ✅
 - [x] Script import: อ่าน `Data/unified_points.csv` → collection `points`
       (แปลง type, สร้าง `location` GeoJSON, คำนวณ `localDate` + `localMinutes` ตาม timezone dataset)
 - [x] สร้าง index: `2dsphere(location)`, `dataset+timestamp`, `dataset+localDate` (อยู่ท้าย import script)
@@ -15,7 +15,10 @@
 - [x] Script สร้าง `daily_stats`: aggregate ต่อ dataset/วัน/ชั่วโมง (count, min/avg/max ต่อ metric)
 - [x] Script ดึงโซน OSM (Overpass): cluster bbox จากจุดจริง + buffer, tag ตาม PLAN ข้อ 9,
       เก็บเฉพาะ polygon ที่มีจุดข้อมูล ≥ 5 จุดข้างใน → collection `zones` (`source: "osm"`)
-- [ ] **รันจริงกับ Atlas** — รอ `MONGODB_URI` ใน `.env` จากผู้ใช้ แล้วรัน import → tracks → stats → zones
+- [x] **รันจริงกับ Atlas แล้ว** — `points` 81,629 / `tracks` 50 segments / `daily_stats` 113 / `zones` 18
+      — โซน OSM ดึงเฉพาะไทย (`--thailand-only`) เพราะ Overpass ล้นบ่อย; Osaka ยังไม่มีโซน
+        รันเพิ่มทีหลังได้: `node fetch_zones.js` (มี cache ใน `.overpass-cache/` ไม่ดึงซ้ำ, `--cache-only` = ไม่ยิงเน็ต)
+      — หมายเหตุเครื่องนี้: Node resolve SRV ไม่ได้ lib.js เลย setServers 8.8.8.8/1.1.1.1
 - [x] ตรวจยอด (dry-run ไม่ใช้ DB): CSV = 81,629 แถว / **50,036** มีพิกัด — ตรงกับ geojson
       (SCHEMA.md เขียน 50,033 เป็นเลขเก่าของเอกสาร ไม่ใช่ข้อมูลผิด)
 
@@ -25,6 +28,7 @@
 - [ ] `GET /api/tracks` — filter เดียวกัน
 - [ ] `GET /api/stats` — aggregation ตาม filter
 - [ ] `GET/POST/PUT/DELETE /api/zones` — CRUD โซน (validate geometry)
+      — GET กรองเฉพาะโซนใกล้จุดข้อมูล ≤ 20 กม. (คำนวณตอน save/import แล้ว cache ใน doc เป็น `nearData: true`)
 - [ ] `GET /api/zones/stats` — `$geoWithin` ต่อโซน + filter เวลา
 - [ ] Error handling + ข้อความชัดเมื่อไม่มี `MONGODB_URI`
 

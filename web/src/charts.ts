@@ -90,7 +90,9 @@ export function lineOption(
       name: s.name,
       data: s.data,
       color: s.color,
-      showSymbol: false,
+      // ต้องโชว์จุดเสมอ — ชั่วโมงที่มีข้อมูลโดดๆ (เพื่อนบ้านเป็น null) จะไม่มีเส้นให้ลาก
+      // ปิด symbol ไว้แล้วกราฟจะว่างเปล่าทั้งที่มีข้อมูล
+      showSymbol: true,
       symbolSize: 8,
       lineStyle: { width: 2 },
       connectNulls: false,

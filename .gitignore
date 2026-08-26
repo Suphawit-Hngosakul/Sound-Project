@@ -8,3 +8,4 @@ dist/
 .gemini/
 Data/
 pipeline/.overpass-cache/
+.ui-shots/

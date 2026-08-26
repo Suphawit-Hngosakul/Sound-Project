@@ -48,10 +48,22 @@ cd web && npm run dev       # http://localhost:5173
 
 Vite proxy `/api` ไปที่ port 3001 ให้แล้ว ไม่ต้องตั้ง CORS อะไรเพิ่ม
 
-### ทดสอบ API
+### ทดสอบ
 
 ```
-cd server && npm run e2e    # ยิงทุก endpoint ทุก filter เทียบผลให้สอดคล้องกัน (server ต้องรันอยู่)
+cd server && npm test       # 42 เคส validate filter + 89 เคสยิง API จริงกับ mongod ในเครื่อง (ไม่ต้องมี Atlas)
+cd web && npm test          # 72 เคส logic ฝั่งเว็บ (เวลาท้องถิ่น, สี, timeline replay, สรุปสถิติ)
+cd server && npm run e2e    # ยิงทุก endpoint กับ server ที่รันอยู่จริง (ใช้ได้ทั้ง Atlas และ fixture)
+cd web && npm run test:ui   # เปิด Edge จริงไล่ทุกหน้า เก็บภาพหน้าจอไว้ที่ .ui-shots/
+```
+
+`npm test` ของ server ยก mongod ขึ้นในเครื่องเอง (mongodb-memory-server) ครั้งแรกจะโหลด binary สักพัก
+
+### ดูหน้าเว็บโดยไม่ต้องมี Atlas
+
+```
+cd server && npm run dev:fixtures    # API พร้อมข้อมูลตัวอย่างชุดเล็ก (ของปลอม ไม่ใช่ข้อมูลจริง)
+cd web && npm run dev
 ```
 
 ### build เวอร์ชันจริง

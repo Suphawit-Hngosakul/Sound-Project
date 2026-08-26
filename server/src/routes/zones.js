@@ -9,6 +9,13 @@ const DEG_MARGIN = (NEAR_DATA_KM / 111) * 1.05; // ~20 กม. เป็นอ�
 
 const CATEGORIES = ['worship', 'tourism', 'park', 'residential', 'commercial', 'university', 'other'];
 
+// id ผิดรูปทำให้ new ObjectId() โยน error ธรรมดา -> error handler ตอบ 500
+// ทั้งที่เป็นความผิดของ request ไม่ใช่ของ server
+function toObjectId(id) {
+  if (!ObjectId.isValid(id)) throw badRequest('zone id ไม่ถูกต้อง');
+  return new ObjectId(id);
+}
+
 module.exports = (db) => {
   const router = Router();
   const zones = db.collection('zones');
@@ -91,7 +98,7 @@ module.exports = (db) => {
 
   router.put('/:id', async (req, res, next) => {
     try {
-      const _id = new ObjectId(req.params.id);
+      const _id = toObjectId(req.params.id);
       const patch = validateBody(req.body, { partial: true });
       if (patch.geometry) patch.nearData = await computeNearData(patch.geometry);
       patch.updatedAt = new Date();
@@ -105,7 +112,7 @@ module.exports = (db) => {
 
   router.delete('/:id', async (req, res, next) => {
     try {
-      const r = await zones.deleteOne({ _id: new ObjectId(req.params.id) });
+      const r = await zones.deleteOne({ _id: toObjectId(req.params.id) });
       if (!r.deletedCount) throw Object.assign(badRequest('zone not found'), { status: 404 });
       res.json({ ok: true });
     } catch (e) {

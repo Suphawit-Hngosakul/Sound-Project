@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { pointFilter, badRequest } = require('../filters');
+const { pointFilter, intParam, badRequest } = require('../filters');
 const { METRICS } = require('../db');
 
 const DEFAULT_BINS = 24;
@@ -34,6 +34,7 @@ module.exports = (db) => {
     try {
       const f = pointFilter(req.query);
       const groupBy = req.query.groupBy;
+      if (groupBy !== undefined && !['hour', 'date'].includes(groupBy)) throw badRequest('groupBy ต้องเป็น hour หรือ date');
       let groupId = null;
       if (groupBy === 'hour') groupId = { $floor: { $divide: ['$localMinutes', 60] } };
       else if (groupBy === 'date') groupId = '$localDate';
@@ -74,7 +75,7 @@ module.exports = (db) => {
     try {
       const metric = req.query.metric;
       if (!METRICS.includes(metric)) throw badRequest(`metric ต้องเป็น: ${METRICS.join(', ')}`);
-      const bins = Math.min(Math.max(parseInt(req.query.bins, 10) || DEFAULT_BINS, 4), MAX_BINS);
+      const bins = intParam(req.query.bins, 'bins', 4, MAX_BINS) ?? DEFAULT_BINS;
       const match = { ...pointFilter(req.query), [metric]: { $ne: null } };
 
       const [range] = await points

@@ -1,5 +1,5 @@
 const { Router } = require('express');
-const { pointFilter, badRequest } = require('../filters');
+const { pointFilter, intParam, badRequest } = require('../filters');
 const { METRICS } = require('../db');
 
 const MAX_LIMIT = 60000;
@@ -15,11 +15,13 @@ module.exports = (db) => {
   router.get('/', async (req, res, next) => {
     try {
       const f = pointFilter(req.query, { requireCoords: true });
-      const limit = Math.min(parseInt(req.query.limit, 10) || DEFAULT_LIMIT, MAX_LIMIT);
+      const limit = intParam(req.query.limit, 'limit', 1, MAX_LIMIT) ?? DEFAULT_LIMIT;
+      // ขอเกินมา 1 แถวเพื่อรู้ว่ายังมีต่อไหม — เทียบ rows.length === limit เฉยๆ จะรายงาน
+      // truncated ผิดตอนข้อมูลมีพอดีเท่า limit
       const cursor = points
         .find(f)
         .sort({ timestamp: 1 })
-        .limit(limit)
+        .limit(limit + 1)
         .project({ location: 1, timestamp: 1, localMinutes: 1, gps_interpolated: 1, ...Object.fromEntries(METRICS.map((m) => [m, 1])) });
       const rows = [];
       for await (const p of cursor) {
@@ -33,7 +35,9 @@ module.exports = (db) => {
           p.gps_interpolated ? 1 : 0,
         ]);
       }
-      res.json({ columns: COLUMNS, rows, truncated: rows.length === limit });
+      const truncated = rows.length > limit;
+      if (truncated) rows.pop();
+      res.json({ columns: COLUMNS, rows, truncated });
     } catch (e) {
       next(e);
     }

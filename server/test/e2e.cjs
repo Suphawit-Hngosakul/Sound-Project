@@ -9,7 +9,9 @@ const get = async (p) => { const r = await fetch(BASE + p); return { status: r.s
   check('health', h.status === 200 && h.body.ok);
 
   const ds = await get('/api/datasets');
-  check('datasets = 5 ชุด', ds.status === 200 && ds.body.length === 5, `ได้ ${ds.body?.length}`);
+  const KNOWN = ['Walking', 'OMU', 'Ayutthaya', 'SiteInPuey', 'BirdIoTMic'];
+  // ไม่ผูกกับจำนวนชุดข้อมูล — จะได้รันได้ทั้งกับ Atlas จริงและกับ fixture ตอนพัฒนา
+  check('datasets', ds.status === 200 && ds.body.length > 0 && ds.body.every((d) => KNOWN.includes(d.dataset)), `${ds.body?.length} ชุด: ${ds.body?.map((d) => d.dataset).join(',')}`);
   const datasets = ds.body;
   for (const d of datasets) {
     check(`${d.dataset}: มี dates/metrics/tz`, d.dates.length > 0 && d.metrics.length > 0 && Number.isFinite(d.tzOffsetMin));
@@ -37,8 +39,11 @@ const get = async (p) => { const r = await fetch(BASE + p); return { status: r.s
     check(`points ${d.dataset} interpolated=only สะอาด`, only.body.rows.every(r => r[10] === 1));
     check(`points ${d.dataset}: hide + only = ทั้งหมด`, hide.body.rows.length + only.body.rows.length === all.body.rows.length);
 
-    const lim = await get(`/api/points?dataset=${d.dataset}&limit=10`);
-    check(`points ${d.dataset} limit=10`, lim.body.rows.length === 10 && lim.body.truncated === true);
+    const k = Math.max(1, Math.min(10, all.body.rows.length - 1));
+    const lim = await get(`/api/points?dataset=${d.dataset}&limit=${k}`);
+    check(`points ${d.dataset} limit=${k} + truncated`, lim.body.rows.length === k && lim.body.truncated === true, `${lim.body.rows.length} แถว truncated=${lim.body.truncated}`);
+    const limAll = await get(`/api/points?dataset=${d.dataset}&limit=${all.body.rows.length}`);
+    check(`points ${d.dataset} limit พอดี = ไม่ truncated`, limAll.body.truncated === false);
 
     const id = all.body.rows[0][0];
     const det = await get(`/api/points/${id}`);

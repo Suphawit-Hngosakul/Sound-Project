@@ -83,26 +83,44 @@
   ทุก metric ทุก dataset ผิดพลาด < 1e-6 — เลยไม่ต้องยิง API ซ้ำอีก 5 ครั้ง
 - ตรวจ histogram: ผลรวมทุก bin = total, ค่าสูงสุดไม่ตกขอบ, metric ผิดคืน 400, dataset ที่ไม่มี metric คืน bins ว่าง
 
-## Phase 7 — เก็บงาน
-- [ ] **ทดสอบ end-to-end ทุกหน้า ทุก filter — ยังรันไม่ได้ ติด Atlas ต่อไม่ติด (ดู Blocker ล่าง)**
-      script พร้อมแล้วที่ `server/test/e2e.cjs` (`cd server && npm run e2e`) — ยิงทุก endpoint ทุก filter
-      เทียบผลให้สอดคล้องกัน เช่น hide+only = ทั้งหมด, ผลรวมรายชั่วโมง = ยอดรวม, ไม่มีแถวหลุดช่วงเวลา/bbox
+## Phase 7 — เก็บงาน ✅
+- [x] ทดสอบ end-to-end ทุกหน้า ทุก filter — **331 เคส ผ่านหมด**
+      - `server npm test` — 42 เคส validate filter + 89 เคสยิง API จริงกับ mongod ในเครื่อง (mongodb-memory-server)
+        ใช้ fixture เล็กที่คำนวณคำตอบด้วยมือได้ ค่าคาดหวังเป็นตัวเลขตรงๆ ไม่ใช่แค่ "ไม่ error"
+      - `web npm test` — 72 เคส logic ฝั่งเว็บ (เวลาท้องถิ่น, สี, timeline replay, สรุปสถิติ, กันช่วงวันกลับหัว)
+      - `server npm run e2e` — 102 เคสยิง server ที่รันจริง (ใช้ได้ทั้ง Atlas และ fixture)
+      - `web npm run test:ui` — 26 เคสขับ Edge จริงไล่ทุกหน้า ทั้ง dev server และ build จริง เก็บภาพไว้ `.ui-shots/`
 - [x] ตรวจ performance
-      - เปิด gzip ฝั่ง server (`compression`) — `/api/points` ของ Walking 2.3 MB เหลือราว 1/5
-      - แยก bundle: `/zones` กับ `/dashboard` โหลดแบบ lazy — bundle หลักกลับจาก 2.7 MB เป็น 2.0 MB
-        (556 KB gzip) · Dashboard 194 KB · Zones 26 KB โหลดตอนเข้าหน้าจริง
-      - ยังไม่ได้วัดผล gzip กับ server จริง เพราะ Atlas ต่อไม่ได้
-- [x] ตรวจ i18n — เขียน script ตรวจ key ที่ใช้จริงเทียบกับที่ประกาศ: ใช้ 105 static key + 19 dynamic pattern
-      ครบทั้ง th/en ไม่มี key ขาด ไม่มีข้อความ hardcode (ยกเว้นป้ายปุ่มสลับภาษา `EN`/`ไทย` ซึ่งเป็นชื่อภาษา ไม่ต้องแปล)
-      เก็บ 2 key ที่ประกาศแล้วไม่ได้ใช้: `popup.close` (ทำเป็น aria-label ปุ่มปิด) · `filter.from` (ป้าย "จาก" หน้า date picker)
-- [x] อัปเดต README ครบ — ลำดับรัน pipeline, build จริง, ตาราง route, รายการ API, วิธีทดสอบ, แก้ปัญหาที่เจอบ่อย
+      - เปิด gzip ฝั่ง server (`compression`) — ยืนยันด้วยเทสต์ว่า response ใหญ่ถูกบีบจริง
+      - แยก bundle: `/zones` กับ `/dashboard` โหลดแบบ lazy — bundle หลัก 2.0 MB (556 KB gzip)
+        Dashboard 194 KB · Zones 26 KB โหลดตอนเข้าหน้าจริง
+- [x] ตรวจ i18n — 105 static key + 19 dynamic pattern ครบทั้ง th/en ไม่มีข้อความ hardcode
+- [x] อัปเดต README ครบ — ลำดับรัน pipeline, build, ตาราง route, API, คำสั่งทดสอบ, วิธีเปิดเว็บโดยไม่ต้องมี Atlas
 
-### Blocker ปัจจุบัน
-MongoDB Atlas ต่อไม่ได้: `Could not connect to any servers in your MongoDB Atlas cluster`
-ตรวจแล้วว่า DNS SRV คืน 3 node ปกติ และ TCP ถึง `ac-mghtuin-shard-00-01:27017` ได้
-แต่ driver ต่อไม่ผ่านแม้ยืด `serverSelectionTimeoutMS` เป็น 60 วิ = อาการของ **IP ไม่อยู่ใน Access List**
-IP ขาออกตอนตรวจคือ `27.130.27.139` — แก้โดยเข้า cloud.mongodb.com → Network Access → Add Current IP Address
-พอต่อได้แล้วให้รัน `cd server && npm run e2e` เพื่อปิด task แรกของ Phase 7
+### บั๊กที่เจอตอน debug รอบนี้ (แก้แล้วทุกตัว)
+1. **หน้า Dashboard ขาวทั้งหน้า** — `echarts-for-react/lib/core` เป็น CommonJS และ vite prebundle เป็น
+   `export default require_core()` เลยได้ object ซ้อน default สองชั้น React โยน "Element type is invalid"
+   `tsc` กับ `vite build` ผ่านฉลุยเพราะ type ถูก ผิดแค่ตอน runtime — เจอเพราะเปิดเบราว์เซอร์จริงเท่านั้น
+   แก้ที่ `components/Chart.tsx` แกะ `.default` จนเจอ component
+2. **กราฟเส้นว่างเปล่าทั้งที่มีข้อมูล** — ชั่วโมงที่มีข้อมูลโดดๆ (เพื่อนบ้าน null) ไม่มีเส้นให้ลาก
+   ตอนปิด `showSymbol` เลยไม่เห็นอะไรเลย เปิด symbol ถาวร
+3. **param ผิดรูปถูกเมินเงียบๆ** — `timeStart=abc`, `interpolated=yes`, `dateEnd` ที่ไม่มี `date`,
+   ช่วงวัน/เวลากลับหัว, `bbox` มุมสลับ, `limit=0` ทั้งหมดเคยผ่านแล้วคืนข้อมูล**ที่ไม่ถูกกรอง**กลับไป
+   ตอนนี้ตอบ 400 พร้อมข้อความบอกเหตุ (`filters.js` เขียนใหม่ + ใช้ร่วมกันทุก route)
+4. **`truncated` โกหก** — ข้อมูลมีพอดีเท่า `limit` แล้วรายงานว่าโดนตัด แก้เป็นขอเกินมา 1 แถวแล้วเทียบ
+5. **zone id ผิดรูปตอบ 500** — เป็นความผิดของ request ควรเป็น 400
+6. **เลือกวันเริ่มเลยวันจบได้** — ได้ช่วงกลับหัว (ตอนนี้ API ตอบ 400) และ dateEnd ที่ค้างอยู่หลุดจากตัวเลือกใน select
+   แก้ให้ดันวันจบตามไปเสมอ (`setStartDate`)
+7. **ปุ่ม "ช่วงวัน" เด้งกลับเป็น "วันเดียว"** ถ้าเลือกวันสุดท้ายอยู่ — โหมดดูจากการมี dateEnd อย่างเดียวแล้ว
+8. **`/api/tracks` ไม่ validate วันที่** ต่างจาก endpoint อื่น — ใช้ตัว validate ตัวเดียวกันหมดแล้ว
+
+### หมายเหตุ
+- แผนที่ใน dev server ของ vite โหลด `maplibre-gl-worker.mjs` ไม่ผ่าน (build จริงไม่เป็น) ไม่กระทบการใช้งาน
+  เพราะใช้ raster tile — เทสต์ UI แยกเคสนี้ไว้แล้ว
+- MongoDB Atlas ต่อไม่ได้ตลอดรอบนี้: DNS SRV คืน 3 node ปกติ TCP ถึง `ac-mghtuin-shard-00-01:27017` ได้
+  แต่ driver ต่อไม่ผ่านแม้ยืด timeout 60 วิ = **IP ไม่อยู่ใน Access List** (IP ตอนตรวจ `27.130.27.139`)
+  แก้ที่ cloud.mongodb.com → Network Access → Add Current IP Address
+  ระหว่างนี้ทดสอบด้วย mongod ในเครื่องแทน (`npm test` / `npm run dev:fixtures`) ครอบคลุมทุก endpoint แล้ว
 
 ## Notes จาก agent
 (เขียนต่อท้ายที่นี่เมื่อเจออะไรที่คนต่อไปต้องรู้)

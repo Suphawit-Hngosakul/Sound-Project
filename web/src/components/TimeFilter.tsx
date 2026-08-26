@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import type { TimeFilterState } from '../api'
-import { minutesToHHMM } from '../api'
+import { minutesToHHMM, setStartDate } from '../api'
 
 interface Props {
   dates: string[] // วันที่มีข้อมูลจริง
@@ -13,7 +13,11 @@ type Mode = 'all' | 'single' | 'range'
 // filter วัน (เฉพาะวันมีข้อมูล) + ช่วงเวลาในวัน (slider คู่ 00:00–24:00)
 export default function TimeFilter({ dates, value, onChange }: Props) {
   const { t } = useTranslation()
-  const mode: Mode = !value.date ? 'all' : value.dateEnd && value.dateEnd !== value.date ? 'range' : 'single'
+  // โหมด range ดูจากการมี dateEnd อย่างเดียว — ถ้าเทียบว่าต้องไม่เท่ากับ date ด้วย
+  // การกดปุ่ม "ช่วงวัน" ตอนเลือกวันสุดท้ายอยู่จะเด้งกลับเป็น "วันเดียว" ทันที
+  const mode: Mode = !value.date ? 'all' : value.dateEnd ? 'range' : 'single'
+
+  const setStart = (date: string) => onChange(setStartDate(value, date))
 
   const setMode = (m: Mode) => {
     if (m === 'all') onChange({ ...value, date: null, dateEnd: null })
@@ -35,7 +39,7 @@ export default function TimeFilter({ dates, value, onChange }: Props) {
       {mode !== 'all' && (
         <div className="row">
           {mode === 'range' && <span className="dim small">{t('filter.from')}</span>}
-          <select value={value.date ?? ''} onChange={(e) => onChange({ ...value, date: e.target.value })}>
+          <select value={value.date ?? ''} onChange={(e) => setStart(e.target.value)}>
             {dates.map((d) => (
               <option key={d} value={d}>
                 {d}

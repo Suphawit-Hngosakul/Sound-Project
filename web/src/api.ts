@@ -124,6 +124,12 @@ export interface TimeFilterState {
   timeEnd: number
 }
 
+// เลือกวันเริ่มใหม่ — ถ้าไปเลยวันจบ ให้ดันวันจบตามไปด้วย
+// ไม่งั้นได้ช่วงกลับหัว (API ตอบ 400) และ dateEnd ที่ค้างอยู่ก็หลุดจากตัวเลือกใน select
+export function setStartDate(f: TimeFilterState, date: string): TimeFilterState {
+  return { ...f, date, dateEnd: f.dateEnd && f.dateEnd < date ? date : f.dateEnd }
+}
+
 export function filterParams(f: TimeFilterState): Record<string, string> {
   const p: Record<string, string> = {}
   if (f.date) {

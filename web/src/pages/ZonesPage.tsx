@@ -171,10 +171,15 @@ export default function ZonesPage({ datasets }: { datasets: DatasetInfo[] }) {
                   <button className="zone-main" onClick={() => selectZone(z._id)}>
                     <span className="swatch" style={{ background: z.color }} />
                     <span className="zone-name">{z.name}</span>
-                    <span className="dim small">{t(`zoneCategory.${z.category}`)}</span>
-                    <span className="dim small">
-                      {s ? t('zonesPage.points', { n: s.count.toLocaleString() }) : '—'}
-                      {z.source === 'user' ? ` · ${t('zone.sourceUser')}` : ''}
+                    {/* ประเภท จำนวนจุด และที่มา รวมเป็นบรรทัดเดียว — แยกคอลัมน์แล้วไปชนกับปุ่มแก้/ลบ */}
+                    <span className="zone-meta">
+                      {[
+                        t(`zoneCategory.${z.category}`),
+                        s ? t('zonesPage.points', { n: s.count.toLocaleString() }) : null,
+                        z.source === 'user' ? t('zone.sourceUser') : null,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
                     </span>
                   </button>
                   <div className="zone-actions">

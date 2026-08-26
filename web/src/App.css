@@ -25,7 +25,7 @@
 }
 
 .nav-link {
-  padding: 6px 12px;
+  padding: 8px 12px;
   border-radius: 7px;
   text-decoration: none;
   color: var(--text);
@@ -33,10 +33,11 @@
 }
 .nav-link:hover {
   background: var(--panel-2);
+  color: var(--text-h);
 }
 .nav-link.active {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -47,7 +48,7 @@
 }
 .nav-select.active {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -65,8 +66,10 @@
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 7px;
-  padding: 5px 12px;
+  padding: 6px 12px;
+  min-height: 32px;
   cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
 }
 .lang-btn:hover {
   border-color: var(--accent);
@@ -179,8 +182,14 @@
   cursor: pointer;
   user-select: none;
 }
+.check {
+  min-height: 26px;
+}
 .check input {
   accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
 }
 
 .swatch {
@@ -200,17 +209,24 @@
   flex: 1;
   background: var(--panel);
   border: 0;
-  padding: 6px 4px;
+  padding: 7px 6px;
+  min-height: 30px;
   cursor: pointer;
   font-size: 13px;
   white-space: nowrap;
+  color: var(--dim);
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.seg-btn:hover {
+  background: var(--panel-2);
+  color: var(--text-h);
 }
 .seg-btn + .seg-btn {
   border-left: 1px solid var(--border);
 }
 .seg-btn.active {
   background: var(--accent-bg);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 600;
 }
 
@@ -230,6 +246,8 @@
   width: 100%;
   accent-color: var(--accent);
   margin: 0;
+  /* แถบสูง 16px จับยาก โดยเฉพาะบนจอสัมผัส — ขยายพื้นที่กดโดยไม่ขยายตัวแถบ */
+  height: 26px;
 }
 
 .link-btn {
@@ -237,9 +255,16 @@
   border: 0;
   color: var(--accent);
   cursor: pointer;
-  padding: 0;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  min-height: 24px;
   align-self: flex-start;
   font-size: 13px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.link-btn:hover {
+  background: var(--accent-bg);
 }
 
 .btn {
@@ -356,8 +381,18 @@
 .table-details summary {
   cursor: pointer;
   font-size: 12px;
-  color: var(--accent);
+  color: var(--accent-ink);
   list-style: none;
+  min-height: 26px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: fit-content;
+  padding-right: 4px;
+  border-radius: 6px;
+}
+.table-details summary:hover {
+  color: var(--accent);
 }
 .table-details summary::-webkit-details-marker {
   display: none;
@@ -442,28 +477,40 @@
   border-radius: 7px;
   padding: 2px 4px;
 }
+.zone-row {
+  transition: background 0.12s ease;
+}
 .zone-row:hover {
   background: var(--panel);
 }
 .zone-row.selected {
   background: var(--accent-bg);
 }
+.zone-row.selected .zone-name {
+  color: var(--accent-ink);
+}
 
 .zone-main {
   flex: 1;
   min-width: 0;
   display: grid;
-  grid-template-columns: 12px 1fr auto;
+  grid-template-columns: 12px minmax(0, 1fr);
   align-items: center;
-  gap: 3px 7px;
+  gap: 2px 8px;
   background: none;
   border: 0;
-  padding: 4px 2px;
+  padding: 6px 4px;
   cursor: pointer;
   text-align: left;
+  border-radius: 6px;
 }
 .zone-main .swatch {
   grid-row: span 2;
+}
+.zone-meta {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--dim);
 }
 .zone-name {
   color: var(--text-h);
@@ -471,14 +518,11 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.zone-main > .dim:last-child {
-  grid-column: 2 / -1;
-}
-
 .zone-actions {
   display: flex;
-  flex-direction: column;
   gap: 2px;
+  flex: 0 0 auto;
+  align-self: center;
 }
 .link-btn.danger {
   color: var(--error);
@@ -681,6 +725,16 @@
   margin: 0;
   color: var(--text-h);
 }
+/* การ์ดสูงไม่เท่ากันเพราะจำนวนบรรทัดต่างกัน — ดันปุ่มลงล่างให้ขอบล่างตรงกันทุกใบ */
+.card .btn {
+  margin-top: auto;
+}
+.card {
+  transition: border-color 0.15s ease;
+}
+.card:hover {
+  border-color: var(--dim);
+}
 .metric-list {
   font-size: 12px;
 }
@@ -700,21 +754,82 @@
 }
 
 /* ---- responsive ---- */
+@media (max-width: 900px) {
+  .chart-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 @media (max-width: 860px) {
+  /* แผนที่คือเนื้อหาหลัก ต้องเห็นทันทีที่เปิด ไม่ใช่ต้องเลื่อนผ่านแผงตัวกรองก่อน */
   .dataset-layout {
     grid-template-columns: 1fr;
-    grid-template-rows: auto 65vh;
+    grid-template-rows: 58svh auto;
     height: auto;
+    min-height: 100%;
+  }
+  .dataset-layout .map-wrap {
+    order: -1;
+    border-bottom: 1px solid var(--border);
   }
   .sidebar {
     border-right: 0;
-    border-bottom: 1px solid var(--border);
     overflow: visible;
   }
-  .navbar {
-    overflow-x: auto;
-  }
   .popup-panel {
-    width: 240px;
+    width: min(280px, calc(100% - 64px));
+  }
+  .overview-layout .map-wrap {
+    height: 52svh;
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 640px) {
+  /* จอแคบวางเมนูสองแถว — ของเดิมล้นออกนอกจอ ปุ่มเปลี่ยนภาษากับแดชบอร์ดกดไม่ถึง */
+  .navbar {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 8px 12px;
+    row-gap: 6px;
+  }
+  .brand {
+    order: 0;
+    margin-right: 0;
+  }
+  .spacer,
+  .nav-tag,
+  .lang-btn {
+    order: 1;
+  }
+  .nav-tag {
+    margin-left: auto;
+  }
+  /* ตัวคั่นบรรทัด: ดันเมนูทั้งชุดลงแถวสอง แบรนด์กับปุ่มภาษาอยู่แถวบนเสมอ */
+  .navbar::after {
+    content: '';
+    order: 1;
+    flex-basis: 100%;
+    height: 0;
+  }
+  .nav-link,
+  .nav-select {
+    order: 2;
+  }
+  .nav-select {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+  .nav-link {
+    padding: 8px 10px;
+  }
+  .page-pad {
+    padding: 16px 14px;
+  }
+  .cards {
+    padding: 14px;
+  }
+  .zone-list {
+    max-height: none;
   }
 }

@@ -86,7 +86,7 @@ export default function App() {
             <Route path="/" element={<OverviewPage datasets={datasets} />} />
             <Route path="/dataset/:name" element={<DatasetPage datasets={datasets} />} />
             <Route path="/zones" element={<ZonesPage datasets={datasets} />} />
-            <Route path="/dashboard" element={<DashboardPage />} />
+            <Route path="/dashboard" element={<DashboardPage datasets={datasets} />} />
           </Routes>
         )}
       </main>

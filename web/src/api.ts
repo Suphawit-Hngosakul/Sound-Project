@@ -88,6 +88,15 @@ export interface StatBlock {
   metrics: Partial<Record<Metric, { min: number; avg: number; max: number; count: number }>>
 }
 
+export interface Histogram {
+  metric: Metric
+  min: number | null
+  max: number | null
+  binWidth: number
+  total: number
+  bins: { from: number; to: number; count: number }[]
+}
+
 export interface PointDetail {
   _id: string
   dataset: string
@@ -151,6 +160,8 @@ export const api = {
   pointDetail: (id: string) => get<PointDetail>(`/api/points/${id}`),
   tracks: (params: Record<string, string>) => get<TrackSeg[]>('/api/tracks', params),
   stats: (params: Record<string, string>) => get<StatBlock | StatBlock[]>('/api/stats', params),
+  statsBy: (params: Record<string, string>) => get<StatBlock[]>('/api/stats', params),
+  histogram: (params: Record<string, string>) => get<Histogram>('/api/stats/histogram', params),
   zones: (params?: Record<string, string>) => get<Zone[]>('/api/zones', params),
   zoneStats: (params: Record<string, string>) => get<ZoneStat[]>('/api/zones/stats', params),
   createZone: (body: ZoneInput) => send<Zone>('/api/zones', 'POST', body),
@@ -158,12 +169,24 @@ export const api = {
   deleteZone: (id: string) => send<{ ok: true }>(`/api/zones/${id}`, 'DELETE'),
 }
 
+// สีประจำ dataset — ผ่าน validator ของ dataviz skill ทั้งโหมดสว่างและมืด
+// (CVD ΔE ต่ำสุดของคู่ติดกัน 9.1 light / 8.4 dark, normal-vision 19.6 / 19.3)
+// ชุดเดิม (#e6194b/#4363d8/...) ตกเกณฑ์ CVD คู่เขียว-ส้ม ΔE 6.2 เลยเปลี่ยน
 export const DATASET_COLORS: Record<string, string> = {
-  Walking: '#e6194b',
-  OMU: '#4363d8',
-  Ayutthaya: '#f58231',
-  SiteInPuey: '#3cb44b',
-  BirdIoTMic: '#911eb4',
+  Walking: '#2a78d6',
+  OMU: '#eb6834',
+  Ayutthaya: '#1baf7a',
+  SiteInPuey: '#eda100',
+  BirdIoTMic: '#e87ba4',
+}
+
+// สเต็ปเดียวกันที่ปรับให้อ่านออกบนพื้นมืด (ไม่ใช่การพลิกสีอัตโนมัติ)
+export const DATASET_COLORS_DARK: Record<string, string> = {
+  Walking: '#3987e5',
+  OMU: '#d95926',
+  Ayutthaya: '#199e70',
+  SiteInPuey: '#c98500',
+  BirdIoTMic: '#d55181',
 }
 
 // แสดงเวลาท้องถิ่นของ dataset (OMU = UTC+9 ที่เหลือ +7) — ห้ามใช้ timezone เครื่องผู้ใช้

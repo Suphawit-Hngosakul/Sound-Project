@@ -1,27 +1,31 @@
-require('dotenv').config({ path: require('path').join(__dirname, '..', '..', '.env') });
 const express = require('express');
 const cors = require('cors');
-const mongoose = require('mongoose');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, mongo: mongoose.connection.readyState === 1 });
-});
+const { connectDB } = require('./db');
 
 const PORT = process.env.PORT || 3001;
 
 async function main() {
-  if (!process.env.MONGODB_URI) {
-    console.error(
-      'ไม่พบ MONGODB_URI — คัดลอก .env.example เป็น .env ที่ root โปรเจกต์ แล้วใส่ connection string ของ MongoDB Atlas'
-    );
-    process.exit(1);
-  }
-  await mongoose.connect(process.env.MONGODB_URI);
+  const db = await connectDB();
   console.log('MongoDB connected');
+
+  const app = express();
+  app.use(cors());
+  app.use(express.json({ limit: '2mb' })); // zone geometry ใหญ่ได้
+
+  app.get('/api/health', (req, res) => res.json({ ok: true }));
+  app.use('/api/datasets', require('./routes/datasets')(db));
+  app.use('/api/points', require('./routes/points')(db));
+  app.use('/api/tracks', require('./routes/tracks')(db));
+  app.use('/api/stats', require('./routes/stats')(db));
+  app.use('/api/zones', require('./routes/zones')(db));
+
+  // error handler กลาง — status จาก badRequest หรือ 500
+  app.use((err, req, res, next) => {
+    const status = err.status || 500;
+    if (status >= 500) console.error(err);
+    res.status(status).json({ error: err.message });
+  });
+
   app.listen(PORT, () => console.log(`API listening on http://localhost:${PORT}`));
 }
 

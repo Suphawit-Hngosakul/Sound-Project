@@ -22,15 +22,17 @@
 - [x] ตรวจยอด (dry-run ไม่ใช้ DB): CSV = 81,629 แถว / **50,036** มีพิกัด — ตรงกับ geojson
       (SCHEMA.md เขียน 50,033 เป็นเลขเก่าของเอกสาร ไม่ใช่ข้อมูลผิด)
 
-## Phase 2 — API
-- [ ] `GET /api/datasets` — รายชื่อ + สรุป
-- [ ] `GET /api/points` — filter: dataset, date/dateEnd, timeStart/timeEnd, metric, interpolated, bbox, limit — response แบบกระชับ (array)
-- [ ] `GET /api/tracks` — filter เดียวกัน
-- [ ] `GET /api/stats` — aggregation ตาม filter
-- [ ] `GET/POST/PUT/DELETE /api/zones` — CRUD โซน (validate geometry)
-      — GET กรองเฉพาะโซนใกล้จุดข้อมูล ≤ 20 กม. (คำนวณตอน save/import แล้ว cache ใน doc เป็น `nearData: true`)
-- [ ] `GET /api/zones/stats` — `$geoWithin` ต่อโซน + filter เวลา
-- [ ] Error handling + ข้อความชัดเมื่อไม่มี `MONGODB_URI`
+## Phase 2 — API ✅
+- [x] `GET /api/datasets` — สรุปต่อ dataset + `dates` (วันมีข้อมูลจริง สำหรับ date picker) + cache 5 นาที
+- [x] `GET /api/points` — filter: dataset, date/dateEnd, timeStart/timeEnd, interpolated=hide|only, bbox, limit
+      — response กระชับ `{columns, rows[[...]], truncated}` + `GET /api/points/:id` รายละเอียดเต็มสำหรับ popup
+- [x] `GET /api/tracks` — filter dataset + ช่วงวัน; **ช่วงเวลาในวันให้ frontend ตัด vertex เองจาก `times[]`**
+- [x] `GET /api/stats` — สรุปรวม หรือ `groupBy=hour|date` เป็น series
+- [x] `GET/POST/PUT/DELETE /api/zones` — CRUD (validate ชื่อ/category/geometry ด้วย turf)
+      — GET default เฉพาะ `nearData: true` (≤ ~20 กม. จากจุดข้อมูล, lazy compute + cache ใน doc), `?all=1` เอาหมด
+- [x] `GET /api/zones/stats` — `$geoWithin` ต่อโซน + filter เวลา — ทดสอบจริง: วัดมหาธาตุ 1,764 จุด avg 60.2 dB
+- [x] Error handler กลาง + fail ชัดเมื่อไม่มี `MONGODB_URI`
+- ทดสอบแล้วทุก endpoint กับ Atlas จริง (health/datasets/points/point:id/stats/tracks/zones CRUD/zone stats/validation)
 
 ## Phase 3 — Web พื้นฐาน + แผนที่
 - [ ] Layout: navbar (ลิงก์ 4 หน้า) + ระบบ i18n th/en (toggle บน navbar)

@@ -258,6 +258,113 @@
   filter: brightness(1.08);
 }
 
+/* ---- zones ---- */
+.zone-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 40vh;
+  overflow-y: auto;
+}
+
+.zone-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 7px;
+  padding: 2px 4px;
+}
+.zone-row:hover {
+  background: var(--panel);
+}
+.zone-row.selected {
+  background: var(--accent-bg);
+}
+
+.zone-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 12px 1fr auto;
+  align-items: center;
+  gap: 3px 7px;
+  background: none;
+  border: 0;
+  padding: 4px 2px;
+  cursor: pointer;
+  text-align: left;
+}
+.zone-main .swatch {
+  grid-row: span 2;
+}
+.zone-name {
+  color: var(--text-h);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zone-main > .dim:last-child {
+  grid-column: 2 / -1;
+}
+
+.zone-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.link-btn.danger {
+  color: var(--error);
+}
+
+.zone-form .field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.zone-form .field.row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+.zone-form input[type='text'],
+.zone-form input:not([type]) {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  width: 100%;
+}
+.zone-form input[type='color'] {
+  width: 46px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: none;
+}
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stats-table th {
+  font-weight: 500;
+  color: var(--dim);
+  text-align: right;
+  font-size: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.stats-table td:not(:first-child) {
+  text-align: right;
+  width: auto;
+}
+.stats-table td:first-child {
+  width: 40%;
+}
+
 /* ---- replay ---- */
 .play-btn {
   padding: 4px 14px;

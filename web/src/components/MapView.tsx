@@ -52,15 +52,21 @@ interface Props {
   // — ไม่ fit ตอนเปลี่ยน filter เพราะ bounds คำนวณใหม่ทุกครั้งที่ข้อมูลมา
   fitKey?: string
   getTooltip?: (info: PickingInfo) => TooltipContent
+  // เรียกครั้งเดียวตอนแผนที่พร้อม — หน้า Zones ต้องใช้ instance ต่อ Terra Draw
+  onMapReady?: (map: MapLibreMap) => void
 }
 
-export default function MapView({ layers, bounds, fitKey = '', getTooltip }: Props) {
+export default function MapView({ layers, bounds, fitKey = '', getTooltip, onMapReady }: Props) {
   const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const overlayRef = useRef<MapboxOverlay | null>(null)
   const fittedKeyRef = useRef<string | null>(null)
   const [basemap, setBasemap] = useState<Basemap>(() => (localStorage.getItem('basemap') as Basemap) ?? 'street')
+
+  // เก็บ callback ไว้ใน ref — ถ้าใส่ใน deps ของ effect สร้างแผนที่ แผนที่จะถูกสร้างใหม่ทุก render
+  const readyRef = useRef(onMapReady)
+  readyRef.current = onMapReady
 
   useEffect(() => {
     const map = new MapLibreMap({
@@ -74,6 +80,7 @@ export default function MapView({ layers, bounds, fitKey = '', getTooltip }: Pro
     map.addControl(overlay)
     mapRef.current = map
     overlayRef.current = overlay
+    map.once('load', () => readyRef.current?.(map))
     return () => {
       map.remove()
       mapRef.current = null

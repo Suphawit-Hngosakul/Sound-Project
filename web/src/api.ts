@@ -40,6 +40,21 @@ export interface TrackSeg {
   values: Record<Metric, (number | null)[]>
 }
 
+// ต้องตรงกับ CATEGORIES ฝั่ง server (routes/zones.js)
+export const ZONE_CATEGORIES = ['worship', 'tourism', 'park', 'residential', 'commercial', 'university', 'other'] as const
+export type ZoneCategory = (typeof ZONE_CATEGORIES)[number]
+
+// สีเริ่มต้นต่อประเภท — ชุดเดียวกับที่ pipeline ใช้กับโซน OSM
+export const CATEGORY_COLOR: Record<ZoneCategory, string> = {
+  worship: '#e6a23c',
+  tourism: '#f56c6c',
+  park: '#67c23a',
+  residential: '#909399',
+  commercial: '#409eff',
+  university: '#9b59b6',
+  other: '#409eff',
+}
+
 export interface Zone {
   _id: string
   name: string
@@ -47,6 +62,23 @@ export interface Zone {
   color: string
   source: 'osm' | 'user'
   geometry: GeoJSON.Polygon | GeoJSON.MultiPolygon
+}
+
+export interface ZoneInput {
+  name: string
+  category: ZoneCategory
+  color: string
+  geometry?: GeoJSON.Polygon | GeoJSON.MultiPolygon
+}
+
+export interface ZoneStat {
+  zoneId: string
+  name: string
+  category: string
+  color: string
+  source: 'osm' | 'user'
+  count: number
+  metrics: Partial<Record<Metric, { min: number; avg: number; max: number; count: number }>>
 }
 
 export interface StatBlock {
@@ -101,6 +133,18 @@ async function get<T>(url: string, params?: Record<string, string>): Promise<T> 
   return res.json()
 }
 
+// เขียนข้อมูล — ต้องโยน error ข้อความจาก server ออกมา (validate ชื่อ/ประเภท/geometry อยู่ฝั่งนั้น)
+async function send<T>(url: string, method: 'POST' | 'PUT' | 'DELETE', body?: unknown): Promise<T> {
+  const res = await fetch(url, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => null)
+  if (!res.ok) throw new Error(data?.error ?? `HTTP ${res.status}`)
+  return data as T
+}
+
 export const api = {
   datasets: () => get<DatasetInfo[]>('/api/datasets'),
   points: (params: Record<string, string>) => get<PointsResponse>('/api/points', params),
@@ -108,12 +152,10 @@ export const api = {
   tracks: (params: Record<string, string>) => get<TrackSeg[]>('/api/tracks', params),
   stats: (params: Record<string, string>) => get<StatBlock | StatBlock[]>('/api/stats', params),
   zones: (params?: Record<string, string>) => get<Zone[]>('/api/zones', params),
-  zoneStats: (params: Record<string, string>) => get<unknown[]>('/api/zones/stats', params),
-  createZone: (body: unknown) =>
-    fetch('/api/zones', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json()),
-  updateZone: (id: string, body: unknown) =>
-    fetch(`/api/zones/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json()),
-  deleteZone: (id: string) => fetch(`/api/zones/${id}`, { method: 'DELETE' }).then((r) => r.json()),
+  zoneStats: (params: Record<string, string>) => get<ZoneStat[]>('/api/zones/stats', params),
+  createZone: (body: ZoneInput) => send<Zone>('/api/zones', 'POST', body),
+  updateZone: (id: string, body: Partial<ZoneInput>) => send<Zone>(`/api/zones/${id}`, 'PUT', body),
+  deleteZone: (id: string) => send<{ ok: true }>(`/api/zones/${id}`, 'DELETE'),
 }
 
 export const DATASET_COLORS: Record<string, string> = {

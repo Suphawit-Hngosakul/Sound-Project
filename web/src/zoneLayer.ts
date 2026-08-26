@@ -15,8 +15,16 @@ interface ZoneProps {
   color: string
 }
 
+interface ZoneLayerOptions {
+  onClick?: (zoneId: string) => void
+  selectedId?: string | null
+  // ปิด pick ตอนกำลังวาดโซน ไม่งั้น deck กินคลิกก่อนถึง Terra Draw
+  pickable?: boolean
+}
+
 // zones overlay ใช้ร่วมกันทุกหน้า (PLAN ข้อ 7.6)
-export function makeZoneLayer(zones: Zone[], onClick?: (zoneId: string) => void) {
+export function makeZoneLayer(zones: Zone[], opts: ZoneLayerOptions = {}) {
+  const { onClick, selectedId = null, pickable = true } = opts
   return new GeoJsonLayer({
     id: ZONE_LAYER_ID,
     data: {
@@ -28,12 +36,12 @@ export function makeZoneLayer(zones: Zone[], onClick?: (zoneId: string) => void)
       })),
     },
     getFillColor: (f: { properties: ZoneProps }) =>
-      [...hexToRgb(f.properties.color), 45] as [number, number, number, number],
+      [...hexToRgb(f.properties.color), f.properties.id === selectedId ? 110 : 45] as [number, number, number, number],
     getLineColor: (f: { properties: ZoneProps }) =>
-      [...hexToRgb(f.properties.color), 180] as [number, number, number, number],
-    getLineWidth: 2,
+      [...hexToRgb(f.properties.color), f.properties.id === selectedId ? 255 : 180] as [number, number, number, number],
+    getLineWidth: (f: { properties: ZoneProps }) => (f.properties.id === selectedId ? 4 : 2),
     lineWidthUnits: 'pixels',
-    pickable: true, // ต้องเปิดไว้เสมอ ไม่งั้น hover ไม่ติด
+    pickable,
     autoHighlight: true,
     highlightColor: [255, 255, 255, 80],
     onClick: onClick
@@ -41,7 +49,23 @@ export function makeZoneLayer(zones: Zone[], onClick?: (zoneId: string) => void)
           if (pick.object) onClick(pick.object.properties.id)
         }
       : undefined,
+    updateTriggers: { getFillColor: [selectedId], getLineColor: [selectedId], getLineWidth: [selectedId] },
   })
+}
+
+// bbox ของ geometry — ใช้ zoom ไปที่โซนที่เลือก
+export function zoneBounds(zone: Zone): [[number, number], [number, number]] {
+  let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity
+  const rings = zone.geometry.type === 'Polygon' ? zone.geometry.coordinates : zone.geometry.coordinates.flat()
+  for (const ring of rings) {
+    for (const [lng, lat] of ring) {
+      if (lng < minLng) minLng = lng
+      if (lat < minLat) minLat = lat
+      if (lng > maxLng) maxLng = lng
+      if (lat > maxLat) maxLat = lat
+    }
+  }
+  return [[minLng, minLat], [maxLng, maxLat]]
 }
 
 // tooltip ตอน hover โซน — ชื่อ + ประเภท; layer อื่น (จุดวัด) คืน null ปล่อยผ่าน

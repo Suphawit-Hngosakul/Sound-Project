@@ -61,11 +61,16 @@
   รวม round-trip timeline, ความแม่น float32, ไม่มีช่วงที่จุดวิ่งหาย
 - ตรวจ `localMinutesOf` ฝั่ง client ตรงกับ `localMinutes` ที่ server คำนวณ 8,000 แถว ไม่ผิดสักแถว (ทั้ง +7 และ OMU +9)
 
-## Phase 5 — Zones UI
-- [ ] หน้า Zones: แผนที่ + รายการโซน (ชื่อ ประเภท สี source)
-- [ ] วาดโซนด้วย Terra Draw → form ชื่อ/ประเภท/สี → save
-- [ ] แก้/ลบโซน (ลบต้อง confirm)
-- [ ] แสดง zone stats ต่อโซน (respect filter เวลา)
+## Phase 5 — Zones UI ✅
+- [x] หน้า Zones: แผนที่ + รายการโซน (สี ชื่อ ประเภท จำนวนจุด ที่มา) · คลิกโซนบนแผนที่หรือในรายการ = เลือก + zoom ไปหา
+- [x] วาดโซนด้วย Terra Draw (polygon / rectangle / circle) → ฟอร์มชื่อ/ประเภท/สี → POST
+      สีเริ่มต้นเปลี่ยนตามประเภทให้ จนกว่าผู้ใช้จะแตะ color picker เอง
+- [x] แก้ (PUT ชื่อ/ประเภท/สี) / ลบ (confirm ก่อน) — error จาก server เด้งขึ้นในฟอร์ม
+- [x] zone stats ต่อโซน — min/avg/max ทุก metric ที่มี + จำนวนจุด respect filter วัน/ช่วงเวลา
+- ทดสอบ CRUD เต็มวงจรกับ Atlas จริง: POST → GET → PUT → stats (474 จุด avg 63.1 dB) → DELETE → 404
+  ชื่อภาษาไทย round-trip ตรงทุก codepoint · validate name ว่าง/category ผิด คืน 400 พร้อมข้อความไทย · DB กลับมา 18 โซนเท่าเดิม
+- หน้า Zones ดึง `?all=1` ตั้งใจ — ถ้ากรอง nearData โซนที่ผู้ใช้เพิ่งวาดไกลจากข้อมูลจะหายไปเงียบๆ หลังกดบันทึก
+  ส่วนแผนที่หน้าอื่น (Overview/Dataset) ยังใช้ default nearData ตาม PLAN ข้อ 9 (ตอนนี้ 18 โซนผ่านเกณฑ์ทั้งหมด ผลเลยเท่ากัน)
 
 ## Phase 6 — Dashboard
 - [ ] Tab ต่อ dataset: การ์ดสรุป + time series + histogram
@@ -95,5 +100,10 @@
   แล้ว replay เดินบน progress ของ timeline (แปลงกลับเป็นเวลาจริงด้วย `timelineToReal()` ตอนวาด/แสดงเวลา)
 - **DataFilterExtension ส่งค่าเข้า GPU เป็น float32** — ห้ามใส่ epoch ms ตรงๆ (1.7e12 เหลือความละเอียด ~66 วินาที
   วัดจริงแล้ว) `LineDatum.p` เลยเก็บ progress บน timeline แทน (~1e7 ผิดพลาด 0 ms)
+- Terra Draw วาดผ่าน layer ของ maplibre โดยตรง ส่วน deck.gl overlay อยู่ทับข้างบน
+  ตอนเข้าโหมดวาดต้องปิด `pickable` ของ zone layer ไม่งั้น deck กินคลิกก่อนถึง Terra Draw
+- `/api/zones/stats` ยิง aggregate ทีละโซน (N+1) — 18 โซนใช้ ~1.2–1.8 วิ ถ้าโซนเยอะขึ้นมากค่อยรวมเป็น query เดียว
+- ทดสอบ API ที่มีข้อความไทยด้วย `curl -d @file.json` เท่านั้น — พิมพ์ JSON ไทย inline ใน Git Bash
+  จะโดนแปลงเป็น `?` ตั้งแต่ก่อนถึง curl (ไม่ใช่บั๊กของ server เคยหลงมาแล้ว)
 - `/api/points?dataset=Walking` = 2.3 MB / ~1 วิ (26,490 จุด) — ยังไม่ได้เปิด gzip ฝั่ง server
   ถ้า Phase 7 พบว่าช้า ให้ใส่ middleware `compression` (ลดเหลือ ~1/4)

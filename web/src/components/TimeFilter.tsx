@@ -34,6 +34,7 @@ export default function TimeFilter({ dates, value, onChange }: Props) {
 
       {mode !== 'all' && (
         <div className="row">
+          {mode === 'range' && <span className="dim small">{t('filter.from')}</span>}
           <select value={value.date ?? ''} onChange={(e) => onChange({ ...value, date: e.target.value })}>
             {dates.map((d) => (
               <option key={d} value={d}>

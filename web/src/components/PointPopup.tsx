@@ -27,7 +27,7 @@ export default function PointPopup({ pointId, tzOffsetMin, onClose }: Props) {
     <div className="popup-panel">
       <div className="popup-head">
         <span>{t('popup.title')}</span>
-        <button className="link-btn" onClick={onClose}>
+        <button className="link-btn" onClick={onClose} aria-label={t('popup.close')} title={t('popup.close')}>
           ✕
         </button>
       </div>

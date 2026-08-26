@@ -84,10 +84,25 @@
 - ตรวจ histogram: ผลรวมทุก bin = total, ค่าสูงสุดไม่ตกขอบ, metric ผิดคืน 400, dataset ที่ไม่มี metric คืน bins ว่าง
 
 ## Phase 7 — เก็บงาน
-- [ ] ทดสอบ end-to-end ทุกหน้า ทุก filter
-- [ ] ตรวจ performance: Walking 26k จุด ต้องลื่น
-- [ ] ตรวจ i18n ครบทุก string
-- [ ] อัปเดต README วิธีรันครบ (pipeline → server → web)
+- [ ] **ทดสอบ end-to-end ทุกหน้า ทุก filter — ยังรันไม่ได้ ติด Atlas ต่อไม่ติด (ดู Blocker ล่าง)**
+      script พร้อมแล้วที่ `server/test/e2e.cjs` (`cd server && npm run e2e`) — ยิงทุก endpoint ทุก filter
+      เทียบผลให้สอดคล้องกัน เช่น hide+only = ทั้งหมด, ผลรวมรายชั่วโมง = ยอดรวม, ไม่มีแถวหลุดช่วงเวลา/bbox
+- [x] ตรวจ performance
+      - เปิด gzip ฝั่ง server (`compression`) — `/api/points` ของ Walking 2.3 MB เหลือราว 1/5
+      - แยก bundle: `/zones` กับ `/dashboard` โหลดแบบ lazy — bundle หลักกลับจาก 2.7 MB เป็น 2.0 MB
+        (556 KB gzip) · Dashboard 194 KB · Zones 26 KB โหลดตอนเข้าหน้าจริง
+      - ยังไม่ได้วัดผล gzip กับ server จริง เพราะ Atlas ต่อไม่ได้
+- [x] ตรวจ i18n — เขียน script ตรวจ key ที่ใช้จริงเทียบกับที่ประกาศ: ใช้ 105 static key + 19 dynamic pattern
+      ครบทั้ง th/en ไม่มี key ขาด ไม่มีข้อความ hardcode (ยกเว้นป้ายปุ่มสลับภาษา `EN`/`ไทย` ซึ่งเป็นชื่อภาษา ไม่ต้องแปล)
+      เก็บ 2 key ที่ประกาศแล้วไม่ได้ใช้: `popup.close` (ทำเป็น aria-label ปุ่มปิด) · `filter.from` (ป้าย "จาก" หน้า date picker)
+- [x] อัปเดต README ครบ — ลำดับรัน pipeline, build จริง, ตาราง route, รายการ API, วิธีทดสอบ, แก้ปัญหาที่เจอบ่อย
+
+### Blocker ปัจจุบัน
+MongoDB Atlas ต่อไม่ได้: `Could not connect to any servers in your MongoDB Atlas cluster`
+ตรวจแล้วว่า DNS SRV คืน 3 node ปกติ และ TCP ถึง `ac-mghtuin-shard-00-01:27017` ได้
+แต่ driver ต่อไม่ผ่านแม้ยืด `serverSelectionTimeoutMS` เป็น 60 วิ = อาการของ **IP ไม่อยู่ใน Access List**
+IP ขาออกตอนตรวจคือ `27.130.27.139` — แก้โดยเข้า cloud.mongodb.com → Network Access → Add Current IP Address
+พอต่อได้แล้วให้รัน `cd server && npm run e2e` เพื่อปิด task แรกของ Phase 7
 
 ## Notes จาก agent
 (เขียนต่อท้ายที่นี่เมื่อเจออะไรที่คนต่อไปต้องรู้)

@@ -1,12 +1,15 @@
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { DatasetInfo } from './api'
 import { api, DATASET_COLORS } from './api'
 import OverviewPage from './pages/OverviewPage'
 import DatasetPage from './pages/DatasetPage'
-import ZonesPage from './pages/ZonesPage'
-import DashboardPage from './pages/DashboardPage'
+
+// สองหน้านี้ลาก library ก้อนใหญ่มาด้วย (Terra Draw / ECharts) — โหลดตอนเข้าหน้าจริงเท่านั้น
+const ZonesPage = lazy(() => import('./pages/ZonesPage'))
+const DashboardPage = lazy(() => import('./pages/DashboardPage'))
+
 import './App.css'
 
 function Navbar({ datasets }: { datasets: DatasetInfo[] }) {
@@ -82,12 +85,14 @@ export default function App() {
         )}
         {!error && !datasets && <div className="page-pad dim">{t('loading')}</div>}
         {datasets && (
-          <Routes>
-            <Route path="/" element={<OverviewPage datasets={datasets} />} />
-            <Route path="/dataset/:name" element={<DatasetPage datasets={datasets} />} />
-            <Route path="/zones" element={<ZonesPage datasets={datasets} />} />
-            <Route path="/dashboard" element={<DashboardPage datasets={datasets} />} />
-          </Routes>
+          <Suspense fallback={<div className="page-pad dim">{t('loading')}</div>}>
+            <Routes>
+              <Route path="/" element={<OverviewPage datasets={datasets} />} />
+              <Route path="/dataset/:name" element={<DatasetPage datasets={datasets} />} />
+              <Route path="/zones" element={<ZonesPage datasets={datasets} />} />
+              <Route path="/dashboard" element={<DashboardPage datasets={datasets} />} />
+            </Routes>
+          </Suspense>
         )}
       </main>
     </div>

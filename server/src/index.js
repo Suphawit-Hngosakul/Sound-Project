@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const compression = require('compression');
 const { connectDB } = require('./db');
 
 const PORT = process.env.PORT || 3001;
@@ -10,6 +11,8 @@ async function main() {
 
   const app = express();
   app.use(cors());
+  // /api/points ของ Walking = 2.3 MB JSON ล้วน — gzip เหลือราว 1/5
+  app.use(compression());
   app.use(express.json({ limit: '2mb' })); // zone geometry ใหญ่ได้
 
   app.get('/api/health', (req, res) => res.json({ ok: true }));

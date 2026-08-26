@@ -34,13 +34,17 @@
 - [x] Error handler กลาง + fail ชัดเมื่อไม่มี `MONGODB_URI`
 - ทดสอบแล้วทุก endpoint กับ Atlas จริง (health/datasets/points/point:id/stats/tracks/zones CRUD/zone stats/validation)
 
-## Phase 3 — Web พื้นฐาน + แผนที่
-- [ ] Layout: navbar (ลิงก์ 4 หน้า) + ระบบ i18n th/en (toggle บน navbar)
-- [ ] หน้า Overview: แผนที่รวมทุก dataset สีต่างกัน + การ์ดสรุป
-- [ ] หน้า Dataset: แผนที่ MapLibre + จุดวัด (deck.gl) + สีตาม metric ที่เลือก + legend
-- [ ] Popup click จุด — ครบ 15 คอลัมน์ เวลาท้องถิ่น
-- [ ] Layer panel: toggle จุด / heatmap / GPS ประมาณ / zones overlay
-- [ ] Filter วัน (date picker เฉพาะวันมีข้อมูล) + ช่วงเวลาในวัน (slider 00:00–24:00) — มีผลทุก layer
+## Phase 3 — Web พื้นฐาน + แผนที่ ✅
+- [x] Layout: navbar (Overview / dropdown ชุดข้อมูล / Zones / Dashboard) + i18n th/en toggle
+      (`src/i18n.ts` เก็บ string ทั้งหมด, จำภาษาไว้ใน `localStorage.lang`)
+- [x] หน้า Overview: แผนที่รวม — dataset เดินเก็บวาดจาก `tracks` (เบากว่าดึงจุดทั้งหมดมาก),
+      dataset อยู่กับที่ดึง `/api/points?limit=3000` + toggle เปิด/ปิดต่อ dataset + การ์ดสรุป 5 ใบ
+- [x] หน้า Dataset: MapLibre (OSM raster ไม่ใช้ key) + deck.gl ScatterplotLayer + สีตาม metric + legend gradient
+      — ช่วงสี auto จาก min/max ที่เห็นจริง ถ้า min=max ใช้ `METRIC_RANGE` default
+- [x] Popup click จุด — ครบ 15 คอลัมน์ (`GET /api/points/:id`) เวลาท้องถิ่นตาม `tzOffsetMin` ของ dataset
+- [x] Layer panel: toggle จุด / heatmap / GPS ประมาณ / zones overlay (zone layer ใช้ร่วมกันที่ `src/zoneLayer.ts`)
+- [x] Filter วัน (dropdown เฉพาะวันมีข้อมูลจาก `dates`) + ช่วงเวลาในวัน (slider คู่ step 15 นาที) — ส่งเข้า `/api/points` ทุกครั้ง
+- ตรวจแล้ว: `tsc -b` + `vite build` ผ่าน, dev server ตอบทุก route + proxy `/api` ผ่าน, ทุกโมดูล transform 200
 
 ## Phase 4 — เส้นทาง + Replay
 - [ ] Layer เส้นทางเดิน — ไล่สีตาม metric
@@ -66,3 +70,10 @@
 
 ## Notes จาก agent
 (เขียนต่อท้ายที่นี่เมื่อเจออะไรที่คนต่อไปต้องรู้)
+
+- maplibre-gl v6 **ไม่มี default export** — ต้อง `import { Map as MapLibreMap, NavigationControl } from 'maplibre-gl'`
+  และ `StyleSpecification` ก็ไม่ได้ export ออกมา ใช้ `MapOptions['style']` แทน
+- `MapView` fit bounds ใหม่เมื่อ prop `fitKey` เปลี่ยนเท่านั้น (ส่งชื่อ dataset เข้าไป) — ไม่งั้นสลับ dataset
+  จาก dropdown แล้วแผนที่ไม่ขยับ เพราะ component ไม่ remount (route เดิม param ต่าง) และไม่ zoom กระตุกทุกครั้งที่เปลี่ยน filter
+- `/api/points?dataset=Walking` = 2.3 MB / ~1 วิ (26,490 จุด) — ยังไม่ได้เปิด gzip ฝั่ง server
+  ถ้า Phase 7 พบว่าช้า ให้ใส่ middleware `compression` (ลดเหลือ ~1/4)

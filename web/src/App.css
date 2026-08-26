@@ -119,9 +119,38 @@
   position: relative;
   min-height: 0;
 }
+.map-container-wrap,
 .map-container {
   position: absolute;
   inset: 0;
+}
+
+.basemap-switch {
+  position: absolute;
+  left: 12px;
+  bottom: 26px;
+  z-index: 2;
+  width: auto;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+}
+.basemap-switch .seg-btn {
+  padding: 5px 12px;
+  white-space: nowrap;
+}
+
+/* tooltip ตอน hover โซน (deck.gl วางตำแหน่งเอง — ที่นี่คุมแค่หน้าตา) */
+.map-tooltip {
+  background: var(--panel) !important;
+  color: var(--text-h) !important;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  padding: 6px 10px !important;
+  font: 13px/1.4 var(--sans);
+  white-space: pre-line;
+  max-width: 260px;
+  pointer-events: none;
 }
 
 /* ---- panels ---- */

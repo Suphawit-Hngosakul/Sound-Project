@@ -7,7 +7,7 @@ import MapView from '../components/MapView'
 import type { DatasetInfo, PointRow, TrackSeg, Zone } from '../api'
 import { api, COL, DATASET_COLORS } from '../api'
 import { hexToRgb } from '../colors'
-import { makeZoneLayer } from '../zoneLayer'
+import { makeZoneLayer, zoneTooltip } from '../zoneLayer'
 
 // dataset เดินเก็บใช้ tracks (precompute แล้ว เบากว่ามาก) — dataset อยู่กับที่ใช้จุดตรงๆ
 const STATIONARY_LIMIT = '3000'
@@ -112,10 +112,12 @@ export default function OverviewPage({ datasets }: { datasets: DatasetInfo[] }) 
     return out
   }, [visibleTracks, visiblePoints, zones, showZones])
 
+  const tooltip = useMemo(() => zoneTooltip(t), [t])
+
   return (
     <div className="overview-layout">
       <div className="map-wrap">
-        <MapView layers={layers} bounds={bounds} fitKey="overview" />
+        <MapView layers={layers} bounds={bounds} fitKey="overview" getTooltip={tooltip} />
         <div className="map-legend">
           <div className="panel-title">{t('overview.title')}</div>
           {datasets.map((d) => (

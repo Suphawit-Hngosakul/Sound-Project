@@ -1,21 +1,48 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, NavigationControl, type MapOptions } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { MapboxOverlay } from '@deck.gl/mapbox'
-import type { Layer } from '@deck.gl/core'
+import type { Layer, PickingInfo } from '@deck.gl/core'
+import { useTranslation } from 'react-i18next'
+import type { TooltipContent } from '../tooltip'
 
-// แผนที่ฐาน OSM raster (ไม่ใช้ API key) + deck.gl overlay
-const OSM_STYLE: MapOptions['style'] = {
+export type Basemap = 'street' | 'satellite'
+
+// แผนที่ฐานสองแบบ ใส่ไว้ใน style เดียวตั้งแต่แรก แล้วสลับด้วย visibility
+// (setStyle ทีหลังจะทำ deck.gl overlay หลุด) — ทั้งคู่ไม่ต้องใช้ API key
+const BASE_STYLE: MapOptions['style'] = {
   version: 8,
   sources: {
     osm: {
       type: 'raster',
       tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
       tileSize: 256,
+      maxzoom: 19,
       attribution: '© OpenStreetMap contributors',
     },
+    satellite: {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics',
+    },
+    // ภาพดาวเทียมไม่มีชื่อถนน/สถานที่ — ซ้อน layer ป้ายโปร่งใสทับตอนเปิดโหมดดาวเทียม
+    satlabels: {
+      type: 'raster',
+      tiles: [
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+      ],
+      tileSize: 256,
+      maxzoom: 19,
+      attribution: '© Esri',
+    },
   },
-  layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
+  layers: [
+    { id: 'osm', type: 'raster', source: 'osm' },
+    { id: 'satellite', type: 'raster', source: 'satellite', layout: { visibility: 'none' } },
+    { id: 'satlabels', type: 'raster', source: 'satlabels', layout: { visibility: 'none' } },
+  ],
 }
 
 interface Props {
@@ -24,18 +51,21 @@ interface Props {
   // fit ครั้งแรกที่ข้อมูลมา แล้ว fit ใหม่เมื่อ fitKey เปลี่ยน (สลับ dataset)
   // — ไม่ fit ตอนเปลี่ยน filter เพราะ bounds คำนวณใหม่ทุกครั้งที่ข้อมูลมา
   fitKey?: string
+  getTooltip?: (info: PickingInfo) => TooltipContent
 }
 
-export default function MapView({ layers, bounds, fitKey = '' }: Props) {
+export default function MapView({ layers, bounds, fitKey = '', getTooltip }: Props) {
+  const { t } = useTranslation()
   const containerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<MapLibreMap | null>(null)
   const overlayRef = useRef<MapboxOverlay | null>(null)
   const fittedKeyRef = useRef<string | null>(null)
+  const [basemap, setBasemap] = useState<Basemap>(() => (localStorage.getItem('basemap') as Basemap) ?? 'street')
 
   useEffect(() => {
     const map = new MapLibreMap({
       container: containerRef.current!,
-      style: OSM_STYLE,
+      style: BASE_STYLE,
       center: [100.6, 14.07],
       zoom: 9,
     })
@@ -52,8 +82,22 @@ export default function MapView({ layers, bounds, fitKey = '' }: Props) {
   }, [])
 
   useEffect(() => {
-    overlayRef.current?.setProps({ layers })
-  }, [layers])
+    overlayRef.current?.setProps({ layers, getTooltip })
+  }, [layers, getTooltip])
+
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map) return
+    const apply = () => {
+      const sat = basemap === 'satellite'
+      map.setLayoutProperty('osm', 'visibility', sat ? 'none' : 'visible')
+      map.setLayoutProperty('satellite', 'visibility', sat ? 'visible' : 'none')
+      map.setLayoutProperty('satlabels', 'visibility', sat ? 'visible' : 'none')
+    }
+    if (map.isStyleLoaded()) apply()
+    else map.once('load', apply)
+    localStorage.setItem('basemap', basemap)
+  }, [basemap])
 
   useEffect(() => {
     if (bounds && mapRef.current && fittedKeyRef.current !== fitKey) {
@@ -62,5 +106,16 @@ export default function MapView({ layers, bounds, fitKey = '' }: Props) {
     }
   }, [bounds, fitKey])
 
-  return <div ref={containerRef} className="map-container" />
+  return (
+    <div className="map-container-wrap">
+      <div ref={containerRef} className="map-container" />
+      <div className="basemap-switch seg">
+        {(['street', 'satellite'] as Basemap[]).map((b) => (
+          <button key={b} className={basemap === b ? 'seg-btn active' : 'seg-btn'} onClick={() => setBasemap(b)}>
+            {t(`basemap.${b}`)}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
 }

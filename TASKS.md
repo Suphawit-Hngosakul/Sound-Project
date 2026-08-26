@@ -43,6 +43,9 @@
       — ช่วงสี auto จาก min/max ที่เห็นจริง ถ้า min=max ใช้ `METRIC_RANGE` default
 - [x] Popup click จุด — ครบ 15 คอลัมน์ (`GET /api/points/:id`) เวลาท้องถิ่นตาม `tzOffsetMin` ของ dataset
 - [x] Layer panel: toggle จุด / heatmap / GPS ประมาณ / zones overlay (zone layer ใช้ร่วมกันที่ `src/zoneLayer.ts`)
+- [x] สลับแผนที่ฐาน ถนน/ดาวเทียม (Esri World Imagery + layer ป้ายชื่อ ไม่ต้องใช้ key) — ปุ่มมุมซ้ายล่างของแผนที่ทุกหน้า
+      จำค่าไว้ใน `localStorage.basemap`
+- [x] Hover โซน = tooltip ชื่อ + ประเภท + ที่มา (OSM/วาดเอง) + ไฮไลต์โซน
 - [x] Filter วัน (dropdown เฉพาะวันมีข้อมูลจาก `dates`) + ช่วงเวลาในวัน (slider คู่ step 15 นาที) — ส่งเข้า `/api/points` ทุกครั้ง
 - ตรวจแล้ว: `tsc -b` + `vite build` ผ่าน, dev server ตอบทุก route + proxy `/api` ผ่าน, ทุกโมดูล transform 200
 
@@ -75,5 +78,9 @@
   และ `StyleSpecification` ก็ไม่ได้ export ออกมา ใช้ `MapOptions['style']` แทน
 - `MapView` fit bounds ใหม่เมื่อ prop `fitKey` เปลี่ยนเท่านั้น (ส่งชื่อ dataset เข้าไป) — ไม่งั้นสลับ dataset
   จาก dropdown แล้วแผนที่ไม่ขยับ เพราะ component ไม่ remount (route เดิม param ต่าง) และไม่ zoom กระตุกทุกครั้งที่เปลี่ยน filter
+- แผนที่ฐานสองแบบใส่ไว้ใน style เดียวตั้งแต่ init แล้วสลับด้วย `setLayoutProperty(..., 'visibility', ...)`
+  **ห้ามใช้ `map.setStyle()` สลับ** — deck.gl overlay ที่ addControl ไว้จะหลุดไปด้วย
+- `@deck.gl/core` ไม่ได้ export type `TooltipContent` ออกมาจาก index — ประกาศเองที่ `src/tooltip.ts`
+  และ tooltip ใช้ field `text` (innerText) ไม่ใช่ `html` เพราะชื่อโซนมาจาก OSM/ผู้ใช้
 - `/api/points?dataset=Walking` = 2.3 MB / ~1 วิ (26,490 จุด) — ยังไม่ได้เปิด gzip ฝั่ง server
   ถ้า Phase 7 พบว่าช้า ให้ใส่ middleware `compression` (ลดเหลือ ~1/4)

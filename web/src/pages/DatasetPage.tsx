@@ -10,7 +10,7 @@ import PointPopup from '../components/PointPopup'
 import type { DatasetInfo, Metric, PointRow, TimeFilterState, Zone } from '../api'
 import { api, COL, filterParams } from '../api'
 import { colorScale, cssGradient, METRIC_RANGE, NULL_COLOR } from '../colors'
-import { makeZoneLayer } from '../zoneLayer'
+import { makeZoneLayer, zoneTooltip } from '../zoneLayer'
 
 interface LayerToggles {
   points: boolean
@@ -132,6 +132,8 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
     return out
   }, [visibleRows, toggles, zones, mIdx, minV, maxV, metric])
 
+  const tooltip = useMemo(() => zoneTooltip(t), [t])
+
   if (!info) return <div className="page-pad error">{t('notFound')}</div>
 
   return (
@@ -178,7 +180,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
       </aside>
 
       <div className="map-wrap">
-        <MapView layers={layers} bounds={bounds} fitKey={info.dataset} />
+        <MapView layers={layers} bounds={bounds} fitKey={info.dataset} getTooltip={tooltip} />
         {selected && <PointPopup pointId={selected} tzOffsetMin={info.tzOffsetMin} onClose={() => setSelected(null)} />}
       </div>
     </div>

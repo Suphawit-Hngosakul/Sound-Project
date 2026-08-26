@@ -258,6 +258,20 @@
   filter: brightness(1.08);
 }
 
+/* ---- replay ---- */
+.play-btn {
+  padding: 4px 14px;
+  line-height: 1.2;
+}
+.replay-time {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--text-h);
+}
+.panel .legend-labels {
+  gap: 6px;
+}
+
 /* ---- legend ---- */
 .legend {
   display: flex;

@@ -49,9 +49,17 @@
 - [x] Filter วัน (dropdown เฉพาะวันมีข้อมูลจาก `dates`) + ช่วงเวลาในวัน (slider คู่ step 15 นาที) — ส่งเข้า `/api/points` ทุกครั้ง
 - ตรวจแล้ว: `tsc -b` + `vite build` ผ่าน, dev server ตอบทุก route + proxy `/api` ผ่าน, ทุกโมดูล transform 200
 
-## Phase 4 — เส้นทาง + Replay
-- [ ] Layer เส้นทางเดิน — ไล่สีตาม metric
-- [ ] Replay: play/pause/speed, จุดวิ่งตาม timestamp, respect filter
+## Phase 4 — เส้นทาง + Replay ✅
+- [x] Layer เส้นทางเดิน — ไล่สีตาม metric ต่อช่วง (LineLayer ทีละคู่ vertex; PathLayer ได้สีเดียวต่อเส้น)
+      ใช้ scale เดียวกับจุดวัด/legend · toggle เห็นเฉพาะ dataset เดินเก็บ
+- [x] ตัด vertex ตามช่วงเวลาในวันฝั่ง client (`src/tracks.ts` — API กรองได้แค่ระดับวัน)
+      segment เดียวแตกเป็นหลายท่อนได้ถ้าออกนอกหน้าต่างแล้วกลับเข้ามา
+- [x] Replay: play/pause + speed 10/60/300/1200× + scrubber + เวลาท้องถิ่น, จุดวิ่ง interpolate ตาม timestamp
+      เส้นที่ผ่านไปแล้วเข้ม ที่ยังไม่ถึงจาง (DataFilterExtension filter บน GPU)
+- [x] respect filter ทั้งวันและช่วงเวลา — เปลี่ยน filter = timeline สร้างใหม่ เริ่มเล่นจากต้น
+- ทดสอบ logic กับ track จริงทั้ง 3 dataset เดินเก็บ (Walking/OMU/Ayutthaya) ผ่านหมด 20 เคส
+  รวม round-trip timeline, ความแม่น float32, ไม่มีช่วงที่จุดวิ่งหาย
+- ตรวจ `localMinutesOf` ฝั่ง client ตรงกับ `localMinutes` ที่ server คำนวณ 8,000 แถว ไม่ผิดสักแถว (ทั้ง +7 และ OMU +9)
 
 ## Phase 5 — Zones UI
 - [ ] หน้า Zones: แผนที่ + รายการโซน (ชื่อ ประเภท สี source)
@@ -82,5 +90,10 @@
   **ห้ามใช้ `map.setStyle()` สลับ** — deck.gl overlay ที่ addControl ไว้จะหลุดไปด้วย
 - `@deck.gl/core` ไม่ได้ export type `TooltipContent` ออกมาจาก index — ประกาศเองที่ `src/tooltip.ts`
   และ tooltip ใช้ field `text` (innerText) ไม่ใช่ `html` เพราะชื่อโซนมาจาก OSM/ผู้ใช้
+- **Replay ต้องข้ามช่องว่าง** — Walking ช่วงเวลาดิบกว้าง 100 วัน แต่เดินจริงรวมแค่ 457 นาที
+  ถ้าไล่ตามเวลาดิบจะนิ่งเปล่าเกือบตลอด `buildTimeline()` เลยต่อเฉพาะช่วงที่มีข้อมูลเข้าด้วยกัน
+  แล้ว replay เดินบน progress ของ timeline (แปลงกลับเป็นเวลาจริงด้วย `timelineToReal()` ตอนวาด/แสดงเวลา)
+- **DataFilterExtension ส่งค่าเข้า GPU เป็น float32** — ห้ามใส่ epoch ms ตรงๆ (1.7e12 เหลือความละเอียด ~66 วินาที
+  วัดจริงแล้ว) `LineDatum.p` เลยเก็บ progress บน timeline แทน (~1e7 ผิดพลาด 0 ms)
 - `/api/points?dataset=Walking` = 2.3 MB / ~1 วิ (26,490 จุด) — ยังไม่ได้เปิด gzip ฝั่ง server
   ถ้า Phase 7 พบว่าช้า ให้ใส่ middleware `compression` (ลดเหลือ ~1/4)

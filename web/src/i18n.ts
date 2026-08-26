@@ -32,9 +32,16 @@ const resources = {
         points: 'จุดวัด',
         heatmap: 'Heatmap',
         tracks: 'เส้นทางเดิน',
+        replay: 'เล่นย้อนเส้นทาง',
         zones: 'โซน',
         interpolated: 'จุด GPS ประมาณ',
         colorBy: 'สีตามค่า',
+      },
+      replay: {
+        title: 'เล่นย้อนเส้นทาง',
+        speed: 'ความเร็ว',
+        walked: 'เดินจริงรวม {{total}}',
+        noTrack: 'ไม่มีเส้นทางในช่วงที่เลือก',
       },
       filter: {
         title: 'ช่วงเวลา',
@@ -112,9 +119,16 @@ const resources = {
         points: 'Points',
         heatmap: 'Heatmap',
         tracks: 'Tracks',
+        replay: 'Replay',
         zones: 'Zones',
         interpolated: 'Interpolated GPS',
         colorBy: 'Color by',
+      },
+      replay: {
+        title: 'Replay',
+        speed: 'Speed',
+        walked: '{{total}} walked in total',
+        noTrack: 'No track in the selected range',
       },
       filter: {
         title: 'Time filter',

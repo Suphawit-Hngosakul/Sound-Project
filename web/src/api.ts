@@ -141,9 +141,15 @@ export function filterParams(f: TimeFilterState): Record<string, string> {
   return p
 }
 
+// server ติดป้าย X-Data-Source: demo เมื่อเสิร์ฟข้อมูลตัวอย่าง (dev:fixtures)
+// เคยเสียเวลาไล่บั๊ก "พิกัดเพี้ยนเป็นเส้นตรง" ทั้งที่เป็นข้อมูลปลอมของ fixture
+let demoData = false
+export const isDemoData = () => demoData
+
 async function get<T>(url: string, params?: Record<string, string>): Promise<T> {
   const qs = params && Object.keys(params).length ? '?' + new URLSearchParams(params) : ''
   const res = await fetch(url + qs)
+  demoData = res.headers.get('X-Data-Source') === 'demo'
   if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `HTTP ${res.status}`)
   return res.json()
 }

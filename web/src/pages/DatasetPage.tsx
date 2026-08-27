@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { LineLayer, ScatterplotLayer } from '@deck.gl/layers'
@@ -10,9 +10,10 @@ import TimeFilter from '../components/TimeFilter'
 import PointPopup from '../components/PointPopup'
 import ReplayControls from '../components/ReplayControls'
 import type { DatasetInfo, Metric, PointRow, TimeFilterState, TrackSeg, Zone } from '../api'
-import { api, COL, filterParams } from '../api'
-import { colorScale, cssGradient, METRIC_RANGE, NULL_COLOR } from '../colors'
+import { api, COL, DATASET_COLORS, filterParams } from '../api'
+import { colorScale, cssGradient, hexToRgb, METRIC_RANGE, NULL_COLOR } from '../colors'
 import { makeZoneLayer, zoneTooltip } from '../zoneLayer'
+import { firstTooltip, POINTS_LAYER_ID, pointTooltip } from '../tooltip'
 import type { LineDatum } from '../tracks'
 import { buildTimeline, markersAt, timelineToReal, toLines, trimSegments } from '../tracks'
 
@@ -26,6 +27,23 @@ interface LayerToggles {
 }
 
 const TRAIL_FILTER = new DataFilterExtension({ filterSize: 1 })
+
+// array ว่างตัวเดิมเสมอ — สร้างใหม่ทุก render จะทำให้ useMemo ที่พึ่งมันคิดใหม่ตลอด
+const NO_ROWS: PointRow[] = []
+const NO_SEGMENTS: TrackSeg[] = []
+
+// วงของค่าที่สอง สาม ... เริ่มนอกวงทึบ (รัศมีสูงสุด 6px) แล้วไล่ออกทีละวง
+const RING_LAYER_PREFIX = 'points-ring-'
+const RING_RADIUS_PX = 8
+const RING_GAP_PX = 3.5
+
+// สัญลักษณ์ใน legend ต้องหน้าตาเหมือนที่เห็นบนแผนที่ — วงทึบตัวแรก วงกลวงไล่ใหญ่ขึ้นตัวถัดไป
+function glyphStyle(i: number): CSSProperties {
+  const size = i === 0 ? 9 : 9 + i * 3
+  return i === 0
+    ? { width: size, height: size, borderRadius: '50%', background: 'var(--text)' }
+    : { width: size, height: size, borderRadius: '50%', border: '1.5px solid var(--text)' }
+}
 
 export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
   const { name } = useParams()
@@ -41,12 +59,26 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
     zones: true,
     interpolated: true,
   })
-  const [metric, setMetric] = useState<Metric>('sound_db')
-  const [rows, setRows] = useState<PointRow[]>([])
-  const [truncated, setTruncated] = useState(false)
+  // แต่ละค่าที่วัดเป็น layer ของตัวเอง เปิดพร้อมกันได้ ลำดับในนี้ = ลำดับวงบนแผนที่
+  const [activeMetrics, setActiveMetrics] = useState<Metric[]>([])
+  // ผูกชื่อชุดข้อมูลไว้กับข้อมูลเสมอ แล้วค่อยคัดตอน render
+  // ถ้าเก็บแยกกันแล้วล้างด้วย useEffect จะไม่ทัน — effect ของลูก (MapView) ทำงานก่อน effect ของแม่
+  // MapView เลย fit ไปที่ bounds ของชุดเดิม แล้วปักธงว่า fit ให้ชุดใหม่แล้ว พอข้อมูลจริงมาก็ไม่ขยับอีก
+  const [pointData, setPointData] = useState<{ dataset: string; rows: PointRow[]; truncated: boolean }>({
+    dataset: '',
+    rows: NO_ROWS,
+    truncated: false,
+  })
+  const [trackData, setTrackData] = useState<{ dataset: string; segments: TrackSeg[] }>({
+    dataset: '',
+    segments: NO_SEGMENTS,
+  })
+  const rows = pointData.dataset === name ? pointData.rows : NO_ROWS
+  const truncated = pointData.dataset === name && pointData.truncated
+  const segments = trackData.dataset === name ? trackData.segments : NO_SEGMENTS
   const [zones, setZones] = useState<Zone[]>([])
-  const [segments, setSegments] = useState<TrackSeg[]>([])
   const [selected, setSelected] = useState<string | null>(null)
+  const [hovered, setHovered] = useState<PointRow | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,11 +88,20 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
   const [time, setTime] = useState(0)
   const timeRef = useRef(0)
 
-  // metric default = ตัวแรกที่ dataset มี
+  // สลับ dataset แล้วเก็บค่าที่เลือกไว้เท่าที่ชุดใหม่มีจริง ไม่เหลือเลยค่อยเปิดตัวแรกให้
   useEffect(() => {
-    if (info && !info.metrics.includes(metric)) setMetric(info.metrics[0] ?? 'sound_db')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    if (!info) return
+    setActiveMetrics((cur) => {
+      const keep = cur.filter((m) => info.metrics.includes(m))
+      return keep.length ? keep : info.metrics.slice(0, 1)
+    })
   }, [info])
+
+  // เปลี่ยนชุดข้อมูลแล้วต้องปิดแผงรายละเอียด ไม่งั้นค้างอยู่กับจุดของชุดก่อนหน้า
+  useEffect(() => {
+    setSelected(null)
+    setHovered(null)
+  }, [name])
 
   useEffect(() => {
     if (!name) return
@@ -68,10 +109,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
     setError(null)
     api
       .points({ dataset: name, ...filterParams(filter) })
-      .then((r) => {
-        setRows(r.rows)
-        setTruncated(r.truncated)
-      })
+      .then((r) => setPointData({ dataset: name, rows: r.rows, truncated: r.truncated }))
       .catch((e) => setError(String(e)))
       .finally(() => setLoading(false))
   }, [name, filter])
@@ -83,7 +121,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
   // tracks กรองได้แค่ระดับวัน — ช่วงเวลาในวันตัด vertex เองฝั่งนี้
   useEffect(() => {
     if (!name || !info?.moving) {
-      setSegments([])
+      setTrackData({ dataset: name ?? '', segments: NO_SEGMENTS })
       return
     }
     const p: Record<string, string> = { dataset: name }
@@ -91,7 +129,10 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
       p.date = filter.date
       if (filter.dateEnd && filter.dateEnd !== filter.date) p.dateEnd = filter.dateEnd
     }
-    api.tracks(p).then(setSegments).catch(() => setSegments([]))
+    api
+      .tracks(p)
+      .then((segs) => setTrackData({ dataset: name, segments: segs }))
+      .catch(() => setTrackData({ dataset: name, segments: NO_SEGMENTS }))
   }, [name, info?.moving, filter.date, filter.dateEnd])
 
   const visibleRows = useMemo(
@@ -99,20 +140,29 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
     [rows, toggles.interpolated]
   )
 
-  const mIdx = COL[metric]
-  const [minV, maxV] = useMemo(() => {
-    let lo = Infinity
-    let hi = -Infinity
-    for (const r of visibleRows) {
-      const v = r[mIdx] as number | null
-      if (v !== null) {
-        if (v < lo) lo = v
-        if (v > hi) hi = v
+  // ค่าแรกที่เปิดอยู่คือตัวหลัก — เส้นทาง heatmap และหมุด replay ไล่สีตามตัวนี้
+  const primary: Metric = activeMetrics[0] ?? info?.metrics[0] ?? 'sound_db'
+  const mIdx = COL[primary]
+
+  // ช่วง min/max แยกต่อ metric — คนละหน่วยกัน ใช้ช่วงร่วมกันไม่ได้
+  const ranges = useMemo(() => {
+    const out = {} as Record<Metric, [number, number]>
+    for (const m of new Set([primary, ...activeMetrics])) {
+      const idx = COL[m]
+      let lo = Infinity
+      let hi = -Infinity
+      for (const r of visibleRows) {
+        const v = r[idx] as number | null
+        if (v !== null) {
+          if (v < lo) lo = v
+          if (v > hi) hi = v
+        }
       }
+      out[m] = !Number.isFinite(lo) || lo === hi ? METRIC_RANGE[m] : [lo, hi]
     }
-    if (!Number.isFinite(lo) || lo === hi) return METRIC_RANGE[metric]
-    return [lo, hi]
-  }, [visibleRows, mIdx, metric])
+    return out
+  }, [visibleRows, activeMetrics, primary])
+  const [minV, maxV] = ranges[primary] ?? METRIC_RANGE[primary]
 
   const bounds = useMemo(() => {
     if (!rows.length) return null
@@ -129,8 +179,8 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
   }, [rows])
 
   const trimmed = useMemo(
-    () => (info ? trimSegments(segments, metric, info.tzOffsetMin, filter.timeStart, filter.timeEnd) : []),
-    [segments, metric, info, filter.timeStart, filter.timeEnd]
+    () => (info ? trimSegments(segments, primary, info.tzOffsetMin, filter.timeStart, filter.timeEnd) : []),
+    [segments, primary, info, filter.timeStart, filter.timeEnd]
   )
   const timeline = useMemo(() => buildTimeline(trimmed), [trimmed])
   const lines = useMemo(() => toLines(trimmed, timeline), [trimmed, timeline])
@@ -164,6 +214,10 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
     return () => cancelAnimationFrame(raf)
   }, [playing, speed, timeline])
 
+  // ติ๊กเปิด/ปิดค่าที่วัด — ต่อท้ายเสมอ ลำดับที่เลือกจึงเป็นลำดับวงจากในออกนอก
+  const toggleMetric = (m: Metric) =>
+    setActiveMetrics((cur) => (cur.includes(m) ? cur.filter((x) => x !== m) : [...cur, m]))
+
   const seek = (p: number) => {
     timeRef.current = p
     setTime(p)
@@ -181,7 +235,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
   const realTime = useMemo(() => (timeline ? timelineToReal(timeline, time) : 0), [timeline, time])
   const markers = useMemo(() => (replayOn ? markersAt(trimmed, realTime) : []), [replayOn, trimmed, realTime])
 
-  const layers = useMemo(() => {
+  const baseLayers = useMemo(() => {
     const out: Layer[] = []
     if (toggles.zones && zones.length) out.push(makeZoneLayer(zones))
     if (toggles.tracks && lines.length) {
@@ -198,7 +252,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
           getWidth: 3,
           widthUnits: 'pixels',
           widthMinPixels: 2,
-          updateTriggers: { getColor: [metric, minV, maxV, replayOn] },
+          updateTriggers: { getColor: [primary, minV, maxV, replayOn] },
         })
       )
       if (replayOn && timeline) {
@@ -216,7 +270,7 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
             getFilterValue: (d: LineDatum) => d.p,
             filterRange: [-1, time],
             extensions: [TRAIL_FILTER],
-            updateTriggers: { getColor: [metric, minV, maxV] },
+            updateTriggers: { getColor: [primary, minV, maxV] },
           })
         )
       }
@@ -234,26 +288,71 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
       )
     }
     if (toggles.points) {
-      out.push(
-        new ScatterplotLayer({
-          id: 'points',
-          data: visibleRows,
-          getPosition: (r: PointRow) => [r[COL.lng] as number, r[COL.lat] as number],
-          getFillColor: (r: PointRow) => {
-            const v = r[mIdx] as number | null
-            const c = v === null ? NULL_COLOR : colorScale(v, minV, maxV)
-            return [...c, r[COL.interp] === 1 ? 90 : 200] as [number, number, number, number]
-          },
-          radiusMinPixels: 2.5,
-          radiusMaxPixels: 6,
-          getRadius: 4,
-          pickable: true,
-          onClick: (pick: { object?: PointRow }) => {
-            if (pick.object) setSelected(pick.object[COL.id] as string)
-          },
-          updateTriggers: { getFillColor: [metric, minV, maxV] },
+      const position = (r: PointRow) => [r[COL.lng] as number, r[COL.lat] as number] as [number, number]
+      const pick = {
+        pickable: true,
+        onClick: (info2: { object?: PointRow }) => {
+          if (info2.object) setSelected(info2.object[COL.id] as string)
+        },
+        onHover: (info2: { object?: PointRow }) => setHovered(info2.object ?? null),
+      }
+      if (!activeMetrics.length) {
+        // ไม่ได้เปิดค่าไหนเลย = ดูแค่ตำแหน่ง ใช้สีประจำชุดข้อมูล
+        out.push(
+          new ScatterplotLayer({
+            id: POINTS_LAYER_ID,
+            data: visibleRows,
+            getPosition: position,
+            getFillColor: (r: PointRow) =>
+              [...hexToRgb(DATASET_COLORS[info?.dataset ?? ''] ?? '#888888'), r[COL.interp] === 1 ? 90 : 200] as [number, number, number, number],
+            radiusMinPixels: 2.5,
+            radiusMaxPixels: 6,
+            getRadius: 4,
+            ...pick,
+            updateTriggers: { getFillColor: [info?.dataset] },
+          })
+        )
+      } else {
+        // เปิดหลายค่าพร้อมกัน = วงซ้อนกันที่จุดเดียว ตัวแรกเป็นวงทึบ ที่เหลือเป็นวงรอบนอกไล่ออก
+        // ตำแหน่งเดียวกันหมด ต่างกันแค่รัศมี (บอกว่าเป็นค่าไหน) กับสี (บอกว่าค่าเท่าไร)
+        activeMetrics.forEach((m, i) => {
+          const idx = COL[m]
+          const [lo, hi] = ranges[m] ?? METRIC_RANGE[m]
+          const rgba = (r: PointRow) => {
+            const v = r[idx] as number | null
+            const c = v === null ? NULL_COLOR : colorScale(v, lo, hi)
+            return [...c, r[COL.interp] === 1 ? 90 : 220] as [number, number, number, number]
+          }
+          out.push(
+            i === 0
+              ? new ScatterplotLayer({
+                  id: POINTS_LAYER_ID,
+                  data: visibleRows,
+                  getPosition: position,
+                  getFillColor: rgba,
+                  radiusMinPixels: 2.5,
+                  radiusMaxPixels: 6,
+                  getRadius: 4,
+                  ...pick,
+                  updateTriggers: { getFillColor: [m, lo, hi] },
+                })
+              : new ScatterplotLayer({
+                  id: `${RING_LAYER_PREFIX}${m}`,
+                  data: visibleRows,
+                  getPosition: position,
+                  filled: false,
+                  stroked: true,
+                  getLineColor: rgba,
+                  getLineWidth: 1.6,
+                  lineWidthUnits: 'pixels',
+                  getRadius: RING_RADIUS_PX + (i - 1) * RING_GAP_PX,
+                  radiusUnits: 'pixels',
+                  pickable: false, // ให้วงทึบตรงกลางรับ hover/click ตัวเดียว ไม่งั้นซ้อนกันหลายชั้น
+                  updateTriggers: { getLineColor: [m, lo, hi], getRadius: [i] },
+                })
+          )
         })
-      )
+      }
     }
     if (replayOn && markers.length) {
       out.push(
@@ -270,14 +369,57 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
           radiusMinPixels: 7,
           radiusMaxPixels: 12,
           getRadius: 9,
-          updateTriggers: { getFillColor: [metric, minV, maxV] },
+          updateTriggers: { getFillColor: [primary, minV, maxV] },
         })
       )
     }
     return out
-  }, [visibleRows, toggles, zones, mIdx, minV, maxV, metric, lines, replayOn, timeline, time, markers])
+  }, [visibleRows, toggles, zones, mIdx, minV, maxV, primary, activeMetrics, ranges, info?.dataset, lines, replayOn, timeline, time, markers])
 
-  const tooltip = useMemo(() => zoneTooltip(t), [t])
+  const selectedRow = useMemo(
+    () => (selected ? visibleRows.find((r) => r[COL.id] === selected) ?? null : null),
+    [visibleRows, selected]
+  )
+
+  // วงเน้นจุดที่ hover / จุดที่เปิดรายละเอียดอยู่ — จุดวัดกว้างแค่ 4px ท่ามกลางหมื่นจุด
+  // ถ้าไม่มีวงล้อม คลิกแล้วไม่มีทางรู้ว่าแผงข้างๆ พูดถึงจุดไหน
+  // แยก memo จาก baseLayers เพราะ hover ยิงถี่มาก ไม่ควรลากให้ layer หนักๆ สร้างใหม่ทุกครั้ง
+  const focusLayers = useMemo(() => {
+    const rings: { pos: [number, number]; r: number }[] = []
+    const posOf = (r: PointRow) => [r[COL.lng] as number, r[COL.lat] as number] as [number, number]
+    // จุดที่เลือก = วงซ้อนสองชั้น / จุดที่ hover = วงเดียว แยกออกจากกันได้แม้ทับกันอยู่
+    if (selectedRow) rings.push({ pos: posOf(selectedRow), r: 14 }, { pos: posOf(selectedRow), r: 8 })
+    if (hovered && hovered[COL.id] !== selected) rings.push({ pos: posOf(hovered), r: 10 })
+    if (!rings.length) return []
+    const ring = (id: string, color: [number, number, number, number], width: number, grow: number) =>
+      new ScatterplotLayer({
+        id,
+        data: rings,
+        getPosition: (d: { pos: [number, number] }) => d.pos,
+        getRadius: (d: { r: number }) => d.r + grow,
+        radiusUnits: 'pixels',
+        stroked: true,
+        filled: false,
+        getLineColor: color,
+        getLineWidth: width,
+        lineWidthUnits: 'pixels',
+        pickable: false,
+        updateTriggers: { getRadius: [rings] },
+      })
+    // วงดำจางรองข้างล่างก่อน แล้วค่อยวงขาวทับ — อ่านออกทั้งบนแผนที่ถนนและภาพดาวเทียม
+    return [ring('point-focus-halo', [0, 0, 0, 130], 6, 0.5), ring('point-focus', [255, 255, 255, 245], 2.5, 0)]
+  }, [hovered, selectedRow, selected])
+
+  const layers = useMemo(() => [...baseLayers, ...focusLayers], [baseLayers, focusLayers])
+
+  const tooltip = useMemo(
+    () =>
+      firstTooltip(
+        pointTooltip(t, { metrics: activeMetrics, tzOffsetMin: info?.tzOffsetMin ?? 420, selectedId: selected }),
+        zoneTooltip(t)
+      ),
+    [t, activeMetrics, info?.tzOffsetMin, selected]
+  )
 
   if (!info) return <div className="page-pad error">{t('notFound')}</div>
 
@@ -304,22 +446,32 @@ export default function DatasetPage({ datasets }: { datasets: DatasetInfo[] }) {
             )
           })}
           <div className="panel-title" style={{ marginTop: 10 }}>
-            {t('layer.colorBy')}
+            {t('layer.measurements')}
           </div>
-          <select value={metric} onChange={(e) => setMetric(e.target.value as Metric)}>
-            {info.metrics.map((m) => (
-              <option key={m} value={m}>
-                {t(`metric.${m}`)}
-              </option>
-            ))}
-          </select>
-          <div className="legend">
-            <div className="legend-bar" style={{ background: cssGradient() }} />
-            <div className="legend-labels">
-              <span>{minV.toFixed(1)}</span>
-              <span>{maxV.toFixed(1)}</span>
-            </div>
-          </div>
+          <div className="dim small">{t('layer.measurementsHint')}</div>
+          {info.metrics.map((m) => (
+            <label key={m} className="check">
+              <input type="checkbox" checked={activeMetrics.includes(m)} onChange={() => toggleMetric(m)} />
+              {t(`metric.${m}`)}
+            </label>
+          ))}
+          {!activeMetrics.length && <div className="dim small">{t('layer.noMetricSelected')}</div>}
+          {activeMetrics.map((m, i) => {
+            const [lo, hi] = ranges[m] ?? METRIC_RANGE[m]
+            return (
+              <div className="legend" key={m}>
+                <div className="legend-head">
+                  <span className="metric-glyph" style={glyphStyle(i)} />
+                  {t(`metric.${m}`)}
+                </div>
+                <div className="legend-bar" style={{ background: cssGradient() }} />
+                <div className="legend-labels">
+                  <span>{lo.toFixed(1)}</span>
+                  <span>{hi.toFixed(1)}</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
 
         {toggles.replay && info.moving && (

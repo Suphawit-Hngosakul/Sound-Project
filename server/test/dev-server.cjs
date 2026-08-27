@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3001;
   await client.connect();
   const db = client.db('demo');
   await seed(db);
-  createApp(db).listen(PORT, () => {
+  createApp(db, { demo: true }).listen(PORT, () => {
     console.log(`API (ข้อมูลตัวอย่าง) listening on http://localhost:${PORT}`);
     console.log('ข้อมูลชุดนี้เป็นของปลอมสำหรับทดสอบหน้าเว็บ ไม่ใช่ข้อมูลจริง');
   });

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Map as MapLibreMap } from 'maplibre-gl'
-import { TerraDraw, TerraDrawCircleMode, TerraDrawPolygonMode, TerraDrawRectangleMode } from 'terra-draw'
+import {
+  TerraDraw,
+  TerraDrawCircleMode,
+  TerraDrawFreehandMode,
+  TerraDrawPolygonMode,
+  TerraDrawRectangleMode,
+} from 'terra-draw'
 import { TerraDrawMapLibreGLAdapter } from 'terra-draw-maplibre-gl-adapter'
 import type { Layer } from '@deck.gl/core'
 import MapView from '../components/MapView'
@@ -12,8 +18,14 @@ import type { DatasetInfo, TimeFilterState, Zone, ZoneInput, ZoneStat } from '..
 import { api, filterParams } from '../api'
 import { makeZoneLayer, zoneBounds, zoneTooltip } from '../zoneLayer'
 
-type DrawMode = 'polygon' | 'rectangle' | 'circle'
-const DRAW_MODES: DrawMode[] = ['polygon', 'rectangle', 'circle']
+type DrawMode = 'polygon' | 'rectangle' | 'circle' | 'freehand'
+const DRAW_MODES: DrawMode[] = ['polygon', 'rectangle', 'circle', 'freehand']
+
+// วาดอิสระ: ลากหรือคลิกแล้วเลื่อนเมาส์ก็ได้ ไม่ต้องจำว่าโหมดไหนใช้ท่าไหน
+// minDistance กันจุดถี่เกิน (หน่วยพิกเซล) — ลากช้าๆ ทีเดียวได้เป็นพันจุด geometry บวมเกินจำเป็น
+// smoothing เกลี่ยมุมหยักจากมือสั่น
+const freehandMode = () =>
+  new TerraDrawFreehandMode({ drawInteraction: 'click-move-or-drag', minDistance: 8, smoothing: 0.3 })
 
 type Draft = { geometry: GeoJSON.Polygon } | Zone
 
@@ -53,7 +65,7 @@ export default function ZonesPage({ datasets }: { datasets: DatasetInfo[] }) {
     mapRef.current = map
     const draw = new TerraDraw({
       adapter: new TerraDrawMapLibreGLAdapter({ map }),
-      modes: [new TerraDrawPolygonMode(), new TerraDrawRectangleMode(), new TerraDrawCircleMode()],
+      modes: [new TerraDrawPolygonMode(), new TerraDrawRectangleMode(), new TerraDrawCircleMode(), freehandMode()],
     })
     draw.start()
     draw.setMode('static')

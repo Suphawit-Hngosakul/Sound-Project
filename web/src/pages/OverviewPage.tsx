@@ -8,6 +8,7 @@ import type { DatasetInfo, PointRow, TrackSeg, Zone } from '../api'
 import { api, COL, DATASET_COLORS } from '../api'
 import { hexToRgb } from '../colors'
 import { makeZoneLayer, zoneTooltip } from '../zoneLayer'
+import { firstTooltip, OVERVIEW_POINTS_LAYER_ID, overviewPointTooltip } from '../tooltip'
 
 // dataset เดินเก็บใช้ tracks (precompute แล้ว เบากว่ามาก) — dataset อยู่กับที่ใช้จุดตรงๆ
 const STATIONARY_LIMIT = '3000'
@@ -97,7 +98,7 @@ export default function OverviewPage({ datasets }: { datasets: DatasetInfo[] }) 
     if (visiblePoints.length) {
       out.push(
         new ScatterplotLayer({
-          id: 'overview-points',
+          id: OVERVIEW_POINTS_LAYER_ID,
           data: visiblePoints,
           getPosition: (d: { r: PointRow }) => [d.r[COL.lng] as number, d.r[COL.lat] as number],
           getFillColor: (d: { name: string }) =>
@@ -105,14 +106,23 @@ export default function OverviewPage({ datasets }: { datasets: DatasetInfo[] }) 
           getRadius: 5,
           radiusMinPixels: 3,
           radiusMaxPixels: 8,
-          pickable: false,
+          pickable: true,
+          autoHighlight: true,
+          highlightColor: [255, 255, 255, 200],
         })
       )
     }
     return out
   }, [visibleTracks, visiblePoints, zones, showZones])
 
-  const tooltip = useMemo(() => zoneTooltip(t), [t])
+  const tzByDataset = useMemo(
+    () => Object.fromEntries(datasets.map((d) => [d.dataset, d.tzOffsetMin])),
+    [datasets]
+  )
+  const tooltip = useMemo(
+    () => firstTooltip(overviewPointTooltip(t, tzByDataset), zoneTooltip(t)),
+    [t, tzByDataset]
+  )
 
   return (
     <div className="overview-layout">

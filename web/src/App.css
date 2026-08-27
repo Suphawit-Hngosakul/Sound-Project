@@ -17,6 +17,24 @@
   z-index: 5;
 }
 
+/* แถบเตือนว่าข้อมูลที่เห็นเป็นของปลอม — ต้องเห็นทุกหน้า ไม่ใช่แค่ log ใน terminal */
+.demo-banner {
+  flex: 0 0 auto;
+  padding: 7px 14px;
+  font-size: 13px;
+  color: var(--warn);
+  background: rgba(160, 90, 0, 0.1);
+  border-bottom: 1px solid rgba(160, 90, 0, 0.28);
+  text-align: center;
+}
+
+@media (prefers-color-scheme: dark) {
+  .demo-banner {
+    background: rgba(227, 160, 8, 0.16);
+    border-bottom-color: rgba(227, 160, 8, 0.32);
+  }
+}
+
 .brand {
   font-weight: 700;
   color: var(--text-h);
@@ -143,6 +161,12 @@
 }
 
 /* tooltip ตอน hover โซน (deck.gl วางตำแหน่งเอง — ที่นี่คุมแค่หน้าตา) */
+/* ชี้โดนจุด/โซนที่คลิกได้ — maplibre ตั้ง cursor ไว้ที่ canvas เอง ต้องทับด้วย !important */
+.map-container-wrap.picking .maplibregl-canvas-container,
+.map-container-wrap.picking canvas {
+  cursor: pointer !important;
+}
+
 .map-tooltip {
   background: var(--panel) !important;
   color: var(--text-h) !important;
@@ -594,6 +618,23 @@
   flex-direction: column;
   gap: 3px;
 }
+.legend {
+  margin-top: 8px;
+}
+.legend-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text-h);
+}
+/* สัญลักษณ์วง ต้องตรงกับที่วาดบนแผนที่ ไม่งั้น legend โกหก */
+.metric-glyph {
+  display: inline-block;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
 .legend-bar {
   height: 10px;
   border-radius: 5px;

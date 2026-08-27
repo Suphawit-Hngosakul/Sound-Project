@@ -89,19 +89,27 @@ function clusterBboxes(coords) {
   ]);
 }
 
-async function overpassRequest(query) {
+const CACHE_ONLY = process.argv.includes('--cache-only');
+const MAX_ATTEMPTS = 5;
+const BACKOFF_MS = [5000, 15000, 30000, 60000, 60000];
+// คำขอที่ยิงไม่สำเร็จจนหมดรอบ — เก็บไว้รายงานท้ายสุด ไม่ throw ทิ้งงานทั้งรอบ
+const failed = [];
+// หน่วงเพื่อไม่ถล่ม Overpass — ไม่ต้องหน่วงเลยถ้าอ่านจาก cache อย่างเดียว
+const throttle = (ms) => (CACHE_ONLY ? Promise.resolve() : new Promise((r) => setTimeout(r, ms)));
+
+async function overpassRequest(query, label = '') {
   const cacheFile = path.join(CACHE_DIR, crypto.createHash('md5').update(query).digest('hex') + '.json');
   if (fs.existsSync(cacheFile)) {
     process.stderr.write('(cache) ');
     return JSON.parse(fs.readFileSync(cacheFile, 'utf8'));
   }
   // --cache-only: ใช้เฉพาะที่ดึงมาแล้ว ไม่ยิง Overpass เพิ่ม
-  if (process.argv.includes('--cache-only')) {
+  if (CACHE_ONLY) {
     process.stderr.write('(no cache, skip) ');
     return [];
   }
   let lastErr;
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     for (const url of OVERPASS_URLS) {
       try {
         const res = await fetch(url, {
@@ -122,10 +130,15 @@ async function overpassRequest(query) {
       } catch (e) {
         lastErr = e;
       }
-      await new Promise((r) => setTimeout(r, 5000));
+      // 504/429 ของ Overpass เป็นของชั่วคราว — ถอยนานขึ้นทุกรอบ ไม่ใช่ 5 วินาทีเท่ากันหมด
+      await new Promise((r) => setTimeout(r, BACKOFF_MS[Math.min(attempt - 1, BACKOFF_MS.length - 1)]));
     }
   }
-  throw lastErr;
+  // ยอมข้ามคำขอที่ล้ม แทนที่จะทิ้งงานทั้งรอบ — ผลที่ดึงสำเร็จถูก cache ไว้แล้ว
+  // รันซ้ำจะอ่านจาก cache แล้วลองเฉพาะตัวที่ยังขาด
+  failed.push({ label, error: lastErr.message });
+  process.stderr.write(`(ล้ม: ${lastErr.message}) `);
+  return [];
 }
 
 // แตก query รายหมวดต่อ bbox — คำขอเล็กลง เลี่ยง 504
@@ -136,10 +149,10 @@ async function queryOverpass(bbox) {
   for (const t of TAG_CATEGORIES) {
     const query = `[out:json][timeout:120];(way${t.filter}${bb};relation${t.filter}${bb};);out geom;`;
     process.stderr.write(`  ${t.filter} ... `);
-    const elements = await overpassRequest(query);
+    const elements = await overpassRequest(query, `${bb} ${t.filter}`);
     process.stderr.write(`${elements.length} elements\n`);
     all.push(...elements);
-    await new Promise((r) => setTimeout(r, 1500));
+    await throttle(1500);
   }
   return all;
 }
@@ -211,7 +224,7 @@ async function main() {
         geometry,
       });
     }
-    if (i < bboxes.length - 1) await new Promise((r) => setTimeout(r, 3000)); // อย่าถล่ม Overpass
+    if (i < bboxes.length - 1) await throttle(3000);
   }
   console.log(`osm polygons: ${candidates.length} — filtering by data points inside...`);
 
@@ -242,6 +255,12 @@ async function main() {
   const byCat = {};
   for (const z of kept) byCat[z.category] = (byCat[z.category] || 0) + 1;
   console.log('per category:', byCat);
+  if (failed.length) {
+    console.warn(`
+!! ${failed.length} คำขอยิง Overpass ไม่สำเร็จ โซนในพื้นที่นั้นจึงยังไม่ครบ:`);
+    for (const f of failed) console.warn(`   ${f.label} — ${f.error}`);
+    console.warn('   รันคำสั่งเดิมซ้ำได้เลย ตัวที่สำเร็จแล้วอ่านจาก cache ไม่ยิงใหม่');
+  }
   await client.close();
 }
 

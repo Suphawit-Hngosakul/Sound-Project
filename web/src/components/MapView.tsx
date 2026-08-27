@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { Map as MapLibreMap, NavigationControl, type MapOptions } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
+import '../maplibreWorker' // ต้อง import ก่อนสร้าง Map — ตั้ง URL ของ worker ให้ถูก
 import { MapboxOverlay } from '@deck.gl/mapbox'
 import type { Layer, PickingInfo } from '@deck.gl/core'
 import { useTranslation } from 'react-i18next'
 import type { TooltipContent } from '../tooltip'
 
 export type Basemap = 'street' | 'satellite'
+
+// ห่างเกินนี้ (องศา ~110 กม. ต่อองศา) ถือว่าไปคนละพื้นที่ ให้กระโดดแทนการบิน
+const FAR_JUMP_DEG = 1
 
 // แผนที่ฐานสองแบบ ใส่ไว้ใน style เดียวตั้งแต่แรก แล้วสลับด้วย visibility
 // (setStyle ทีหลังจะทำ deck.gl overlay หลุด) — ทั้งคู่ไม่ต้องใช้ API key
@@ -63,6 +67,8 @@ export default function MapView({ layers, bounds, fitKey = '', getTooltip, onMap
   const overlayRef = useRef<MapboxOverlay | null>(null)
   const fittedKeyRef = useRef<string | null>(null)
   const [basemap, setBasemap] = useState<Basemap>(() => (localStorage.getItem('basemap') as Basemap) ?? 'street')
+  // ชี้โดนอะไรที่คลิกได้อยู่ไหม — เอาไว้เปลี่ยนเคอร์เซอร์ให้รู้ว่าจุดนี้กดได้
+  const [picking, setPicking] = useState(false)
 
   // เก็บ callback ไว้ใน ref — ถ้าใส่ใน deps ของ effect สร้างแผนที่ แผนที่จะถูกสร้างใหม่ทุก render
   const readyRef = useRef(onMapReady)
@@ -80,6 +86,9 @@ export default function MapView({ layers, bounds, fitKey = '', getTooltip, onMap
     map.addControl(overlay)
     mapRef.current = map
     overlayRef.current = overlay
+    // เปิดทางให้ debug จาก console ตอน dev (vite ตัดทิ้งตอน build) — ปัญหาแผนที่ดูจาก
+    // style layer จริงเท่านั้นถึงจะรู้เรื่อง เดาจากภาพหน้าจอไม่พอ
+    if (import.meta.env.DEV) (window as unknown as { __map?: MapLibreMap }).__map = map
     map.once('load', () => readyRef.current?.(map))
     return () => {
       map.remove()
@@ -89,7 +98,13 @@ export default function MapView({ layers, bounds, fitKey = '', getTooltip, onMap
   }, [])
 
   useEffect(() => {
-    overlayRef.current?.setProps({ layers, getTooltip })
+    // onHover ระดับ deck ยิงต่อจาก onHover ของ layer (ที่ไม่ return true) — ครอบคลุมทุก layer ที่ pickable
+    // MapboxOverlay ไม่ได้ส่ง getCursor ของ deck ไปถึง canvas ของ maplibre เลยต้องคุมเอง
+    overlayRef.current?.setProps({
+      layers,
+      getTooltip,
+      onHover: (info: PickingInfo) => setPicking(Boolean(info.object)),
+    })
   }, [layers, getTooltip])
 
   useEffect(() => {
@@ -109,12 +124,21 @@ export default function MapView({ layers, bounds, fitKey = '', getTooltip, onMap
   useEffect(() => {
     if (bounds && mapRef.current && fittedKeyRef.current !== fitKey) {
       fittedKeyRef.current = fitKey
-      mapRef.current.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 600 })
+      const map = mapRef.current
+      const here = map.getCenter()
+      const [[minLng, minLat], [maxLng, maxLat]] = bounds
+      // ไกลแค่ไหนถึงนับว่า "คนละที่" — กรุงเทพไปโอซาก้าราว 35 องศา
+      // บินไปช้าๆ ข้ามทวีปไม่ได้ช่วยให้เข้าใจอะไร กระโดดไปเลยดีกว่า
+      // ขยับใกล้ๆ ในพื้นที่เดิมค่อยเลื่อนให้เห็นว่าไปทางไหน
+      const far =
+        Math.abs((minLng + maxLng) / 2 - here.lng) > FAR_JUMP_DEG ||
+        Math.abs((minLat + maxLat) / 2 - here.lat) > FAR_JUMP_DEG
+      map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: far ? 0 : 600 })
     }
   }, [bounds, fitKey])
 
   return (
-    <div className="map-container-wrap">
+    <div className={picking ? 'map-container-wrap picking' : 'map-container-wrap'}>
       <div ref={containerRef} className="map-container" />
       <div className="basemap-switch seg">
         {(['street', 'satellite'] as Basemap[]).map((b) => (

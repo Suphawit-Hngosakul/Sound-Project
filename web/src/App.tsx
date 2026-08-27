@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from 'react'
 import { NavLink, Route, Routes, useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import type { DatasetInfo } from './api'
-import { api, DATASET_COLORS } from './api'
+import { api, DATASET_COLORS, isDemoData } from './api'
 import OverviewPage from './pages/OverviewPage'
 import DatasetPage from './pages/DatasetPage'
 
@@ -61,17 +61,22 @@ export default function App() {
   const { t } = useTranslation()
   const [datasets, setDatasets] = useState<DatasetInfo[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [demo, setDemo] = useState(false)
 
   useEffect(() => {
     api
       .datasets()
-      .then(setDatasets)
+      .then((d) => {
+        setDatasets(d)
+        setDemo(isDemoData())
+      })
       .catch((e) => setError(String(e)))
   }, [])
 
   return (
     <div className="app-shell">
       <Navbar datasets={datasets ?? []} />
+      {demo && <div className="demo-banner">{t('demoData')}</div>}
       <main className="page">
         {error && (
           <div className="page-pad">

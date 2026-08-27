@@ -178,6 +178,19 @@ const close = (a, b, eps = 1e-6) => Math.abs(a - b) < eps;
     check('gzip: ข้อมูลยังถอดออกมาครบ', gzBig.body.rows.length === 300, `${gzBig.body.rows.length} แถว`);
     const gzSmall = await get('/api/points?dataset=BirdIoTMic', { 'Accept-Encoding': 'gzip' });
     check('response เล็กไม่ต้องบีบ (ตามค่าเริ่มต้นของ compression)', gzSmall.headers.get('content-encoding') === null);
+
+    // ---------- ป้ายบอกที่มาของข้อมูล ----------
+    // หน้าเว็บใช้ header นี้ขึ้นแถบเตือนว่ากำลังดูข้อมูลปลอม
+    const real = await get('/api/datasets');
+    check('createApp ปกติติดป้าย X-Data-Source: real', real.headers.get('x-data-source') === 'real', real.headers.get('x-data-source') ?? 'ไม่มี');
+    const demoServer = createApp(db, { demo: true }).listen(0);
+    try {
+      const r = await fetch(`http://127.0.0.1:${demoServer.address().port}/api/datasets`);
+      check('createApp({demo:true}) ติดป้าย X-Data-Source: demo', r.headers.get('x-data-source') === 'demo', r.headers.get('x-data-source') ?? 'ไม่มี');
+      check('demo: header เปิดให้ browser อ่านข้ามโดเมนได้', (r.headers.get('access-control-expose-headers') ?? '').includes('X-Data-Source'));
+    } finally {
+      demoServer.close();
+    }
   } finally {
     server.close();
     await client.close();

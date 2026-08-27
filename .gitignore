@@ -9,3 +9,4 @@ dist/
 Data/
 pipeline/.overpass-cache/
 .ui-shots/
+server/.local-db/

@@ -3,9 +3,15 @@ const cors = require('cors');
 const compression = require('compression');
 
 // แยกการประกอบ app ออกจากการต่อ DB — เทสต์จะได้ยิง API จริงกับ mongod ในเครื่องได้
-function createApp(db) {
+// demo=true คือข้อมูลตัวอย่างที่ปั้นขึ้นมา (dev:fixtures) — ต้องบอกให้หน้าเว็บรู้ ไม่งั้นดูไม่ออกว่า
+// พิกัดเพี้ยนเพราะข้อมูลปลอม หรือเพราะโปรแกรมพัง
+function createApp(db, { demo = false } = {}) {
   const app = express();
-  app.use(cors());
+  app.use(cors({ exposedHeaders: ['X-Data-Source'] }));
+  app.use('/api', (req, res, next) => {
+    res.set('X-Data-Source', demo ? 'demo' : 'real');
+    next();
+  });
   // /api/points ของ Walking = 2.3 MB JSON ล้วน — gzip เหลือราว 1/5
   app.use(compression());
   app.use(express.json({ limit: '2mb' })); // zone geometry ใหญ่ได้

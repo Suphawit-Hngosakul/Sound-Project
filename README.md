@@ -51,20 +51,32 @@ Vite proxy `/api` ไปที่ port 3001 ให้แล้ว ไม่ต�
 ### ทดสอบ
 
 ```
-cd server && npm test       # 42 เคส validate filter + 89 เคสยิง API จริงกับ mongod ในเครื่อง (ไม่ต้องมี Atlas)
+cd server && npm test       # 42 เคส validate filter + 92 เคสยิง API จริงกับ mongod ในเครื่อง (ไม่ต้องมี Atlas)
 cd web && npm test          # 72 เคส logic ฝั่งเว็บ (เวลาท้องถิ่น, สี, timeline replay, สรุปสถิติ)
 cd server && npm run e2e    # ยิงทุก endpoint กับ server ที่รันอยู่จริง (ใช้ได้ทั้ง Atlas และ fixture)
-cd web && npm run test:ui   # เปิด Edge จริงไล่ทุกหน้า เก็บภาพหน้าจอไว้ที่ .ui-shots/
+cd web && npm run test:ui   # เปิด Edge จริงไล่ทุกหน้า วาดโซนจริง เก็บภาพหน้าจอไว้ที่ .ui-shots/
+                            # ทดสอบ build จริงได้ด้วย: npm run preview แล้ว UI_BASE=http://localhost:4173 npm run test:ui
 ```
 
 `npm test` ของ server ยก mongod ขึ้นในเครื่องเอง (mongodb-memory-server) ครั้งแรกจะโหลด binary สักพัก
 
 ### ดูหน้าเว็บโดยไม่ต้องมี Atlas
 
+มีสองแบบ เลือกให้ถูก — แบบแรกเป็นข้อมูลจริง แบบที่สองเป็นของปลอม
+
 ```
-cd server && npm run dev:fixtures    # API พร้อมข้อมูลตัวอย่างชุดเล็ก (ของปลอม ไม่ใช่ข้อมูลจริง)
+cd server && npm run dev:local       # ข้อมูลจริงจาก Data/unified_points.csv บน mongod ในเครื่อง
+cd server && npm run dev:fixtures    # ข้อมูลตัวอย่างชุดเล็กที่ปั้นขึ้นมา (ของปลอม ใช้ทดสอบเท่านั้น)
 cd web && npm run dev
 ```
+
+`dev:local` ยก mongod ขึ้นที่ port 27018 เก็บไฟล์ไว้ที่ `server/.local-db` แล้วรัน pipeline
+(import → tracks → stats → zones แบบ `--cache-only`) ให้อัตโนมัติเมื่อ collection ไหนยังว่าง
+ครั้งแรกใช้เวลาหลายนาที ครั้งต่อไปเปิดได้ทันที สั่ง import ใหม่ทั้งหมดด้วย `npm run dev:local -- --reseed`
+
+`dev:fixtures` มีจุด Ayutthaya 300 จุดที่ไล่พิกัดทีละ 0.0001 จึงขึ้นเป็น**เส้นตรงเฉียง 45 องศา**บนแผนที่
+ถ้าเห็นแบบนั้นแปลว่ากำลังดูข้อมูลปลอมอยู่ ไม่ใช่โปรแกรมพัง — หน้าเว็บจะขึ้นแถบเตือนสีส้มไว้ให้ด้วย
+(server ส่ง header `X-Data-Source: demo`)
 
 ### build เวอร์ชันจริง
 
@@ -78,8 +90,8 @@ cd web && npm run preview   # ลองเปิดไฟล์ที่ build �
 | Route | มีอะไร |
 |---|---|
 | `/` | แผนที่รวมทุกชุดข้อมูล + การ์ดสรุป — เปิด/ปิดทีละชุดได้ |
-| `/dataset/:name` | จุดวัดไล่สีตาม metric, heatmap, เส้นทางเดิน, replay, โซน, filter วัน/ช่วงเวลา, คลิกจุดดูครบ 15 คอลัมน์ |
-| `/zones` | รายการโซน + วาดโซนใหม่ (polygon/สี่เหลี่ยม/วงกลม) + แก้/ลบ + สถิติในโซน |
+| `/dataset/:name` | ค่าที่วัดแต่ละตัวเป็นเลเยอร์ (เปิดพร้อมกันได้ จุดซ้อนเป็นวง), heatmap, เส้นทางเดิน, replay, โซน, filter วัน/ช่วงเวลา, hover จุดดูเวลา+ค่า, คลิกดูครบ 15 คอลัมน์ |
+| `/zones` | รายการโซน + วาดโซนใหม่ (รูปหลายเหลี่ยม/สี่เหลี่ยม/วงกลม/อิสระ) + แก้/ลบ + สถิติในโซน |
 | `/dashboard` | แท็บต่อชุดข้อมูล: การ์ดสรุป + กราฟรายชั่วโมง + histogram, ส่วนเปรียบเทียบข้ามชุด, ตารางค่าเฉลี่ยต่อโซน |
 
 ปุ่มขวาบนสลับไทย/อังกฤษ · ปุ่มซ้ายล่างของแผนที่สลับแผนที่ถนน/ภาพดาวเทียม (จำค่าไว้ใน localStorage)
@@ -114,6 +126,15 @@ Node resolve SRV ของ Atlas ไม่ได้ — `server/src/db.js` ก�
 
 **server ขึ้น `ไม่พบ MONGODB_URI`**
 ยังไม่ได้สร้าง `.env` ที่ root โปรเจกต์ (ไม่ใช่ใน `/server`)
+
+**พิกัดบนแผนที่เป็นเส้นตรงเฉียง / จำนวนจุดน้อยผิดปกติ (Ayutthaya 300 จุด)**
+กำลังต่อกับ `dev:fixtures` ซึ่งเป็นข้อมูลปลอม ไม่ใช่บั๊กของโปรแกรม — ปิดแล้วรัน `npm run dev:local` แทน
+หน้าเว็บขึ้นแถบเตือนสีส้มบนสุดเมื่อ server ตอบ `X-Data-Source: demo`
+
+**วาดโซนแล้วไม่มีอะไรขึ้นบนแผนที่**
+worker ของ maplibre โหลดไม่ได้ — source ชนิด geojson ทุกอันจะเงียบไปหมด (raster ยังปกติ)
+`src/maplibreWorker.ts` ชี้ URL ของ worker ให้แล้วผ่าน `?worker&url` ห้ามลบ import ตัวนี้ออกจาก `MapView.tsx`
+เช็คได้จาก DevTools → Network ว่ามี request ชื่อ `maplibre-gl-worker` ที่ล้มไหม
 
 **หน้าเว็บขึ้น error ทุก request**
 server ยังไม่ได้รัน — เปิด http://localhost:3001/api/health ต้องได้ `{"ok":true}`

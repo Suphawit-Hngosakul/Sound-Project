@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "dev:fixtures": "node test/dev-server.cjs",
+    "dev:local": "node scripts/dev-local.cjs",
     "test": "node test/filters.test.cjs && node test/api.test.cjs",
     "e2e": "node test/e2e.cjs"
   },
